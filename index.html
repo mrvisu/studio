@@ -134,7 +134,7 @@
 
         const DEFAULT_WA_TEMPLATES = {
           welcome: "أهلاً بك أ. {name} في {studio} 📸. نورتنا وشرفتنا! تم تسجيل طلبك بنجاح. \nتفاصيل الطلب: {services}\nالإجمالي: {total} ج.م\nالمدفوع: {paid} ج.م\nالباقي: {remaining} ج.م",
-          invoice: "🧾 فاتورة إلكترونية - {studio}\n----------------------------------\n👤 العميل: {name}\n🧾 رقم الإيصال: {receipt}\n📅 التاريخ: {date}\n----------------------------------\n🛠️ الخدمات:\n{services}\n----------------------------------\n💰 إجمالي الحساب: {total} ج.م\n✅ المدفوع: {paid} ج.م\n🔴 الباقي: {remaining} ج.م\n----------------------------------\nشكراً لثقتكم بنا في {studio} 📸✨",
+          invoice: "أهلاً بك أ. {name} 👋\nنورتنا وشرفتنا في {studio} 📸✨\n\n🧾 فاتورة إلكترونية\n----------------------------------\n🧾 رقم الإيصال: {receipt}\n📅 التاريخ: {date}\n----------------------------------\n🛠️ الخدمات المطلوبة:\n{services}\n----------------------------------\n💰 إجمالي الحساب: {total} ج.م\n✅ المدفوع: {paid} ج.م\n🔴 الباقي: {remaining} ج.م\n----------------------------------\n📍 لمتابعة حالة طلبك خطوة بخطوة، تفضل بزيارة الرابط التالي:\n{track_url}\n\nشكراً لثقتكم بنا!",
           reminder: "مرحباً أ. {name} 🌟. نود تذكيركم بأن هناك مبلغ متبقي لحسابكم في {studio} بقيمة {remaining} ج.م. \nرقم الإيصال: {receipt}.",
           ready: "أهلاً أ. {name} 🎉. الطلب الخاص بك جاهز للاستلام في {studio}! \nباقي الحساب: {remaining} ج.م. نورتنا وشرفتنا!",
           deposit: "تم استلام عربون بقيمة {paid} ج.م من أ. {name} في {studio} 💸. \nإجمالي الطلب: {total} ج.م \nالمتبقي: {remaining} ج.م. شكراً لك!",
@@ -212,6 +212,12 @@
                 if(!data.waTemplates.tracking) {
                     data.waTemplates.tracking = DEFAULT_WA_TEMPLATES.tracking;
                 }
+                
+                // تحديث قالب الفاتورة القديم ليتضمن رابط التتبع والرسالة الترحيبية إذا لم يكن موجوداً
+                if (data.waTemplates.invoice && !data.waTemplates.invoice.includes('{track_url}')) {
+                    data.waTemplates.invoice = DEFAULT_WA_TEMPLATES.invoice;
+                }
+
                 setSettings(data);
               }
             };
