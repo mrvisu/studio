@@ -80,10 +80,38 @@
 
         // --- Order Statuses for Tracking ---
         const ORDER_STATUSES = [
-          { id: 0, label: 'تم التسجيل', icon: 'ph-clipboard-text', activeClass: 'bg-blue-900/40 text-blue-400 border-blue-500/50 shadow-lg shadow-blue-900/20', inactiveClass: 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800' },
-          { id: 1, label: 'جاري العمل', icon: 'ph-paint-brush-broad', activeClass: 'bg-orange-900/40 text-orange-400 border-orange-500/50 shadow-lg shadow-orange-900/20', inactiveClass: 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800' },
-          { id: 2, label: 'جاهز للاستلام', icon: 'ph-check-circle', activeClass: 'bg-green-900/40 text-green-400 border-green-500/50 shadow-lg shadow-green-900/20', inactiveClass: 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800' },
-          { id: 3, label: 'تم التسليم', icon: 'ph-package', activeClass: 'bg-purple-900/40 text-purple-400 border-purple-500/50 shadow-lg shadow-purple-900/20', inactiveClass: 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800' }
+          { 
+              id: 0, label: 'تم التسجيل', icon: 'ph-clipboard-text', 
+              activeClass: 'bg-blue-900/40 text-blue-400 border-blue-500/50 shadow-lg shadow-blue-900/20', 
+              inactiveClass: 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800',
+              clientIconCompleted: 'bg-blue-500 text-white shadow-lg shadow-blue-500/40 border-blue-900',
+              clientCardCurrent: 'bg-blue-900/20 border-blue-500/50 shadow-lg shadow-blue-900/20',
+              clientTextCurrent: 'text-blue-400'
+          },
+          { 
+              id: 1, label: 'جاري العمل', icon: 'ph-paint-brush-broad', 
+              activeClass: 'bg-orange-900/40 text-orange-400 border-orange-500/50 shadow-lg shadow-orange-900/20', 
+              inactiveClass: 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800',
+              clientIconCompleted: 'bg-orange-500 text-white shadow-lg shadow-orange-500/40 border-orange-900',
+              clientCardCurrent: 'bg-orange-900/20 border-orange-500/50 shadow-lg shadow-orange-900/20',
+              clientTextCurrent: 'text-orange-400'
+          },
+          { 
+              id: 2, label: 'جاهز للاستلام', icon: 'ph-check-circle', 
+              activeClass: 'bg-green-900/40 text-green-400 border-green-500/50 shadow-lg shadow-green-900/20', 
+              inactiveClass: 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800',
+              clientIconCompleted: 'bg-green-500 text-white shadow-lg shadow-green-500/40 border-green-900',
+              clientCardCurrent: 'bg-green-900/20 border-green-500/50 shadow-lg shadow-green-900/20',
+              clientTextCurrent: 'text-green-400'
+          },
+          { 
+              id: 3, label: 'تم التسليم', icon: 'ph-package', 
+              activeClass: 'bg-purple-900/40 text-purple-400 border-purple-500/50 shadow-lg shadow-purple-900/20', 
+              inactiveClass: 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800',
+              clientIconCompleted: 'bg-purple-500 text-white shadow-lg shadow-purple-500/40 border-purple-900',
+              clientCardCurrent: 'bg-purple-900/20 border-purple-500/50 shadow-lg shadow-purple-900/20',
+              clientTextCurrent: 'text-purple-400'
+          }
         ];
 
         // --- Default Data & Settings ---
@@ -143,9 +171,11 @@
             studioLogo: ""
           });
 
-          // Check if this is a tracking link view
+          // Check if this is a tracking link view using phone and receipt
           const urlParams = new URLSearchParams(window.location.search);
-          const trackId = urlParams.get('track');
+          const trackPhone = urlParams.get('phone');
+          const trackReceipt = urlParams.get('receipt');
+          const isTracking = trackPhone && trackReceipt;
 
           useEffect(() => {
             const initAuth = async () => {
@@ -193,7 +223,7 @@
               setTransactions(data);
             });
 
-            if(!trackId) { // Only listen to expenses if not in tracking mode
+            if(!isTracking) { // Only listen to expenses if not in tracking mode
                 const unsubExps = onSnapshot(collection(db, basePath, 'expenses'), (snapshot) => {
                   const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
                   data.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -203,16 +233,16 @@
             }
 
             return () => { unsubTxns(); };
-          }, [user, trackId]);
+          }, [user, isTracking]);
 
           useEffect(() => {
-            if (!user || trackId) return; // Prevent client from saving settings
+            if (!user || isTracking) return; // Prevent client from saving settings
             const timer = setTimeout(() => {
               const appId = 'studio-marakby';
               setDoc(doc(db, `artifacts/${appId}/public/data/settings`, 'main'), settings);
             }, 1500);
             return () => clearTimeout(timer);
-          }, [settings, user, trackId]);
+          }, [settings, user, isTracking]);
 
           const formatCurrency = (num) => Number(num || 0).toLocaleString('ar-EG') + ' ج.م';
           const formatDate = (dateStr) => new Date(dateStr).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' });
@@ -229,8 +259,8 @@
             msg = msg.replace(/{studio}/g, settings.studioName || 'الاستوديو');
             msg = msg.replace(/{date}/g, formatDateOnly(txn.dateTime));
             
-            // Tracking URL creation
-            const trackUrl = window.location.href.split('?')[0] + '?track=' + txn.id;
+            // Tracking URL creation using Phone and Receipt
+            const trackUrl = window.location.href.split('?')[0] + `?phone=${encodeURIComponent(txn.phone)}&receipt=${encodeURIComponent(txn.receiptNo)}`;
             msg = msg.replace(/{track_url}/g, trackUrl);
             return msg;
           };
@@ -244,9 +274,17 @@
           };
 
           // --- Client Tracking View ---
-          if (trackId && authReady) {
-              const txn = transactions.find(t => t.id === trackId);
-              if (!txn) return <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400"><i className="ph ph-magnifying-glass text-4xl mb-4"></i>جاري البحث عن الطلب أو الطلب غير موجود...</div>;
+          if (isTracking && authReady) {
+              const txn = transactions.find(t => t.phone === trackPhone && t.receiptNo.toString() === trackReceipt);
+              
+              if (!txn) return (
+                  <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 p-6 text-center">
+                      <i className="ph ph-magnifying-glass text-6xl mb-4 text-slate-600"></i>
+                      <h2 className="text-2xl font-bold mb-2 text-white">الطلب غير موجود</h2>
+                      <p>عذراً، لم نتمكن من العثور على طلب يطابق رقم الهاتف والإيصال المدخلين.</p>
+                      <p className="mt-2 text-sm opacity-70">رقم الهاتف: {trackPhone} | رقم الإيصال: {trackReceipt}</p>
+                  </div>
+              );
               
               const currentStatus = txn.status || 0;
 
@@ -295,12 +333,12 @@
                                   const isCurrent = currentStatus === s.id;
                                   return (
                                       <div key={s.id} className="relative flex items-start gap-5">
-                                          <div className={`relative z-10 flex items-center justify-center w-12 h-12 rounded-full shrink-0 border-4 border-slate-900 transition-colors ${isCompleted ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/40' : 'bg-slate-800 text-slate-600'}`}>
+                                          <div className={`relative z-10 flex items-center justify-center w-12 h-12 rounded-full shrink-0 border-4 transition-colors ${isCompleted ? s.clientIconCompleted : 'border-slate-900 bg-slate-800 text-slate-600'}`}>
                                               <i className={`ph ${s.icon} text-xl`}></i>
                                           </div>
-                                          <div className={`flex-1 p-4 rounded-2xl border transition-all mt-[-4px] ${isCurrent ? 'bg-blue-900/20 border-blue-500/50 shadow-lg shadow-blue-900/20' : isCompleted ? 'bg-slate-800/30 border-slate-800/50' : 'bg-slate-950/50 border-slate-800/30'}`}>
-                                              <h4 className={`font-bold text-sm sm:text-base ${isCurrent ? 'text-blue-400' : isCompleted ? 'text-slate-200' : 'text-slate-600'}`}>{s.label}</h4>
-                                              {isCurrent && <p className="text-xs mt-2 text-blue-300/70 leading-relaxed">هذه هي المرحلة الحالية لطلبك. سنقوم بتحديثها فور انتقالنا للمرحلة التالية.</p>}
+                                          <div className={`flex-1 p-4 rounded-2xl border transition-all mt-[-4px] ${isCurrent ? s.clientCardCurrent : isCompleted ? 'bg-slate-800/30 border-slate-800/50' : 'bg-slate-950/50 border-slate-800/30'}`}>
+                                              <h4 className={`font-bold text-sm sm:text-base ${isCurrent ? s.clientTextCurrent : isCompleted ? 'text-slate-200' : 'text-slate-600'}`}>{s.label}</h4>
+                                              {isCurrent && <p className={`text-xs mt-2 opacity-80 leading-relaxed ${s.clientTextCurrent}`}>هذه هي المرحلة الحالية لطلبك. سنقوم بتحديثها فور انتقالنا للمرحلة التالية.</p>}
                                               {(isCompleted && !isCurrent) && <p className="text-xs mt-1 text-slate-500"><i className="ph ph-check"></i> تمت بنجاح</p>}
                                           </div>
                                       </div>
@@ -341,6 +379,18 @@
                       ))}
                     </div>
                   </div>
+                  
+                  {/* Mobile Navigation */}
+                  <div className="lg:hidden pb-4 overflow-x-auto hide-scrollbar">
+                    <div className="flex items-center gap-2 min-w-max">
+                      {navItems.map(btn => (
+                        <button key={btn.id} onClick={() => setActiveTab(btn.id)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === btn.id ? 'bg-yellow-500 text-slate-900 shadow-md' : 'bg-slate-900 border border-slate-800 text-slate-300 hover:text-white'}`}>
+                          {btn.icon}{btn.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                 </div>
               </nav>
             );
@@ -821,9 +871,9 @@
           return (
             <div className="min-h-screen bg-slate-950 text-slate-100 pb-20">
               {authError && <div className="bg-red-600 text-white text-center py-1 font-bold text-xs">{authError}</div>}
-              {trackId ? null : <Navigation />}
-              <main className={`max-w-7xl mx-auto ${trackId ? '' : 'p-4 md:p-6'}`}>
-                {trackId ? null : (
+              {isTracking ? null : <Navigation />}
+              <main className={`max-w-7xl mx-auto ${isTracking ? '' : 'p-4 md:p-6'}`}>
+                {isTracking ? null : (
                     <>
                         {activeTab === 'dashboard' && <DashboardTab />}
                         {activeTab === 'expenses' && <ExpensesTab />}
