@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ستوديو المراكبى - الإدارة</title>
+    <title>ستوديو المراكبى - الإدارة والتتبع</title>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -26,22 +26,33 @@
         }
         body {
             font-weight: 400;
-            background-color: #f8fafc;
+            background-color: #020617; /* slate-950 */
+            color: #f1f5f9; /* slate-100 */
             margin: 0;
             padding: 0;
+            color-scheme: dark;
         }
         
         main .font-bold { font-weight: 500 !important; }
         main .font-black { font-weight: 600 !important; }
         main b, main strong { font-weight: 500 !important; }
         
-        /* Custom Scrollbar */
+        /* Custom Scrollbar - Dark Theme */
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 8px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
         
         .hide-scrollbar::-webkit-scrollbar { display: none; }
+        
+        /* inputs background fix for autofill */
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover, 
+        input:-webkit-autofill:focus, 
+        input:-webkit-autofill:active{
+            -webkit-box-shadow: 0 0 0 30px #020617 inset !important;
+            -webkit-text-fill-color: white !important;
+        }
     </style>
 </head>
 <body>
@@ -54,15 +65,23 @@
 
         const { useState, useEffect, useMemo } = React;
 
+        // --- Order Statuses for Tracking ---
+        const ORDER_STATUSES = [
+          { id: 0, label: 'تم التسجيل', icon: 'ph-clipboard-text', activeClass: 'bg-blue-900/40 text-blue-400 border-blue-500/50 shadow-lg shadow-blue-900/20', inactiveClass: 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800' },
+          { id: 1, label: 'جاري العمل', icon: 'ph-paint-brush-broad', activeClass: 'bg-orange-900/40 text-orange-400 border-orange-500/50 shadow-lg shadow-orange-900/20', inactiveClass: 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800' },
+          { id: 2, label: 'جاهز للاستلام', icon: 'ph-check-circle', activeClass: 'bg-green-900/40 text-green-400 border-green-500/50 shadow-lg shadow-green-900/20', inactiveClass: 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800' },
+          { id: 3, label: 'تم التسليم', icon: 'ph-package', activeClass: 'bg-purple-900/40 text-purple-400 border-purple-500/50 shadow-lg shadow-purple-900/20', inactiveClass: 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800' }
+        ];
+
         // --- Default Data & Settings ---
         const DEFAULT_SERVICES = [
-          { name: "تصوير زفاف (فرح)", price: 2000 },
-          { name: "سيشن خطوبة", price: 1500 },
-          { name: "صور باسبور 4x6", price: 50 },
-          { name: "طباعة تابلوه خشب", price: 200 },
-          { name: "تصوير منتجات", price: 500 },
-          { name: "فوتوسيشن خارجي", price: 1000 },
-          { name: "تعديل صور (فوتوشوب)", price: 100 }
+          { name: "تصوير زفاف (فرح)", price: 2000, desc: "تغطية الفرح بالكامل + تسليم ألبوم" },
+          { name: "سيشن خطوبة", price: 1500, desc: "تصوير خارجي لمدة ساعتين" },
+          { name: "صور باسبور 4x6", price: 50, desc: "8 صور بخلفية بيضاء + التعديل" },
+          { name: "طباعة تابلوه خشب", price: 200, desc: "مقاس 30x40 سم بجودة عالية" },
+          { name: "تصوير منتجات", price: 500, desc: "تصوير 10 منتجات بخلفية بيضاء" },
+          { name: "فوتوسيشن خارجي", price: 1000, desc: "تصوير بورتريه في مكان مفتوح" },
+          { name: "تعديل صور (فوتوشوب)", price: 100, desc: "ريتاتش وتعديل ألوان وإضاءة" }
         ];
 
         const DEFAULT_EXPENSE_CATEGORIES = [
@@ -75,17 +94,18 @@
           invoice: "🧾 فاتورة إلكترونية - {studio}\n----------------------------------\n👤 العميل: {name}\n🧾 رقم الإيصال: {receipt}\n📅 التاريخ: {date}\n----------------------------------\n🛠️ الخدمات:\n{services}\n----------------------------------\n💰 إجمالي الحساب: {total} ج.م\n✅ المدفوع: {paid} ج.م\n🔴 الباقي: {remaining} ج.م\n----------------------------------\nشكراً لثقتكم بنا في {studio} 📸✨",
           reminder: "مرحباً أ. {name} 🌟. نود تذكيركم بأن هناك مبلغ متبقي لحسابكم في {studio} بقيمة {remaining} ج.م. \nرقم الإيصال: {receipt}.",
           ready: "أهلاً أ. {name} 🎉. الطلب الخاص بك جاهز للاستلام في {studio}! \nباقي الحساب: {remaining} ج.م. نورتنا وشرفتنا!",
-          deposit: "تم استلام عربون بقيمة {paid} ج.م من أ. {name} في {studio} 💸. \nإجمالي الطلب: {total} ج.م \nالمتبقي: {remaining} ج.م. شكراً لك!"
+          deposit: "تم استلام عربون بقيمة {paid} ج.م من أ. {name} في {studio} 💸. \nإجمالي الطلب: {total} ج.م \nالمتبقي: {remaining} ج.م. شكراً لك!",
+          tracking: "مرحباً أ. {name} 👋\nيمكنك الآن متابعة مراحل تجهيز طلبك (إيصال #{receipt}) لحظة بلحظة عبر الرابط التالي:\n{track_url}\n\nشرفتنا في {studio} 📸✨"
         };
 
         const firebaseConfig = {
-  apiKey: "AIzaSyCI0L2fO4_bdltYF7Hddjcxa6seSDbrMwc",
-  authDomain: "studio-noot.firebaseapp.com",
-  projectId: "studio-noot",
-  storageBucket: "studio-noot.firebasestorage.app",
-  messagingSenderId: "376391287753",
-  appId: "1:376391287753:web:58219ac850bde7e2a79e18"
-};
+          apiKey: "AIzaSyCI0L2fO4_bdltYF7Hddjcxa6seSDbrMwc",
+          authDomain: "st.elmrakby@gmail.com",
+          projectId: "studio-noot",
+          storageBucket: "studio-noot.firebasestorage.app",
+          messagingSenderId: "376391287753",
+          appId: "1:376391287753:web:58219ac850bde7e2a79e18"
+        };
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -107,6 +127,10 @@
             studioName: "ستوديو المراكبى",
             studioLogo: ""
           });
+
+          // Check if this is a tracking link view
+          const urlParams = new URLSearchParams(window.location.search);
+          const trackId = urlParams.get('track');
 
           useEffect(() => {
             const initAuth = async () => {
@@ -132,7 +156,19 @@
 
             const fetchSettings = async () => {
               const docSnap = await getDoc(doc(db, basePath, 'settings', 'main'));
-              if (docSnap.exists()) setSettings(docSnap.data());
+              if (docSnap.exists()) {
+                let data = docSnap.data();
+                if (data.services && data.services.length > 0) {
+                    data.services = data.services.map(s => {
+                        if (typeof s === 'string') return { name: s, price: 0, desc: '' };
+                        return { name: s.name, price: s.price || 0, desc: s.desc || '' };
+                    });
+                }
+                if(!data.waTemplates.tracking) {
+                    data.waTemplates.tracking = DEFAULT_WA_TEMPLATES.tracking;
+                }
+                setSettings(data);
+              }
             };
             fetchSettings();
 
@@ -142,23 +178,26 @@
               setTransactions(data);
             });
 
-            const unsubExps = onSnapshot(collection(db, basePath, 'expenses'), (snapshot) => {
-              const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-              data.sort((a, b) => new Date(b.date) - new Date(a.date));
-              setExpenses(data);
-            });
+            if(!trackId) { // Only listen to expenses if not in tracking mode
+                const unsubExps = onSnapshot(collection(db, basePath, 'expenses'), (snapshot) => {
+                  const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                  data.sort((a, b) => new Date(b.date) - new Date(a.date));
+                  setExpenses(data);
+                });
+                return () => { unsubTxns(); unsubExps(); };
+            }
 
-            return () => { unsubTxns(); unsubExps(); };
-          }, [user]);
+            return () => { unsubTxns(); };
+          }, [user, trackId]);
 
           useEffect(() => {
-            if (!user) return;
+            if (!user || trackId) return; // Prevent client from saving settings
             const timer = setTimeout(() => {
               const appId = 'studio-marakby';
               setDoc(doc(db, `artifacts/${appId}/public/data/settings`, 'main'), settings);
             }, 1500);
             return () => clearTimeout(timer);
-          }, [settings, user]);
+          }, [settings, user, trackId]);
 
           const formatCurrency = (num) => Number(num || 0).toLocaleString('ar-EG') + ' ج.م';
           const formatDate = (dateStr) => new Date(dateStr).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' });
@@ -174,6 +213,10 @@
             msg = msg.replace(/{services}/g, txn.requirements || 'خدمات تصوير');
             msg = msg.replace(/{studio}/g, settings.studioName || 'الاستوديو');
             msg = msg.replace(/{date}/g, formatDateOnly(txn.dateTime));
+            
+            // Tracking URL creation
+            const trackUrl = window.location.href.split('?')[0] + '?track=' + txn.id;
+            msg = msg.replace(/{track_url}/g, trackUrl);
             return msg;
           };
 
@@ -185,6 +228,76 @@
             window.open(url, '_blank');
           };
 
+          // --- Client Tracking View ---
+          if (trackId && authReady) {
+              const txn = transactions.find(t => t.id === trackId);
+              if (!txn) return <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400"><i className="ph ph-magnifying-glass text-4xl mb-4"></i>جاري البحث عن الطلب أو الطلب غير موجود...</div>;
+              
+              const currentStatus = txn.status || 0;
+
+              return (
+                  <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-6 flex flex-col items-center">
+                      {/* Studio Header */}
+                      <div className="flex flex-col items-center gap-3 mb-8 mt-6">
+                          {settings.studioLogo ? <img src={settings.studioLogo} className="w-24 h-24 rounded-2xl object-cover shadow-lg shadow-blue-900/20 border border-slate-800" /> : <i className="ph ph-camera text-6xl text-blue-500"></i>}
+                          <h1 className="text-2xl font-black">{settings.studioName}</h1>
+                          <p className="text-slate-400 text-sm">تتبع حالة الطلب الخاص بك</p>
+                      </div>
+
+                      {/* Receipt Info */}
+                      <div className="bg-slate-900 w-full max-w-md p-6 rounded-3xl shadow-xl border border-slate-800 mb-8 relative overflow-hidden">
+                          <div className="absolute top-0 right-0 w-2 h-full bg-blue-500"></div>
+                          <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-800">
+                              <span className="text-slate-400 text-sm">إيصال رقم</span>
+                              <span className="text-2xl font-black font-mono text-white">#{txn.receiptNo}</span>
+                          </div>
+                          <h3 className="text-xl font-bold mb-2 text-blue-400 flex items-center gap-2"><i className="ph ph-user"></i> {txn.clientName}</h3>
+                          <p className="text-sm text-slate-400 mb-5 leading-relaxed">{txn.requirements}</p>
+
+                          <div className="flex justify-between bg-slate-950 p-4 rounded-2xl border border-slate-800 text-sm">
+                               <div className="flex flex-col items-center gap-1">
+                                   <span className="text-slate-500 text-xs">المدفوع</span>
+                                   <span className="text-green-400 font-bold">{txn.paid} ج.م</span>
+                               </div>
+                               <div className="w-px bg-slate-800"></div>
+                               <div className="flex flex-col items-center gap-1">
+                                   <span className="text-slate-500 text-xs">الباقي الدفع</span>
+                                   <span className="text-red-400 font-bold">{txn.remaining} ج.م</span>
+                               </div>
+                          </div>
+                      </div>
+
+                      {/* Timeline */}
+                      <div className="w-full max-w-md bg-slate-900 p-6 sm:p-8 rounded-3xl shadow-xl border border-slate-800 mb-8">
+                          <h3 className="font-bold text-lg mb-8 flex items-center gap-2 border-b border-slate-800 pb-4"><i className="ph ph-clock-counter-clockwise text-blue-500"></i> مراحل تجهيز الطلب:</h3>
+                          
+                          <div className="relative pl-4 space-y-8 pr-4">
+                              {/* Vertical Line */}
+                              <div className="absolute right-[31px] top-6 bottom-6 w-[2px] bg-slate-800"></div>
+
+                              {ORDER_STATUSES.map((s, index) => {
+                                  const isCompleted = currentStatus >= s.id;
+                                  const isCurrent = currentStatus === s.id;
+                                  return (
+                                      <div key={s.id} className="relative flex items-start gap-5">
+                                          <div className={`relative z-10 flex items-center justify-center w-12 h-12 rounded-full shrink-0 border-4 border-slate-900 transition-colors ${isCompleted ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/40' : 'bg-slate-800 text-slate-600'}`}>
+                                              <i className={`ph ${s.icon} text-xl`}></i>
+                                          </div>
+                                          <div className={`flex-1 p-4 rounded-2xl border transition-all mt-[-4px] ${isCurrent ? 'bg-blue-900/20 border-blue-500/50 shadow-lg shadow-blue-900/20' : isCompleted ? 'bg-slate-800/30 border-slate-800/50' : 'bg-slate-950/50 border-slate-800/30'}`}>
+                                              <h4 className={`font-bold text-sm sm:text-base ${isCurrent ? 'text-blue-400' : isCompleted ? 'text-slate-200' : 'text-slate-600'}`}>{s.label}</h4>
+                                              {isCurrent && <p className="text-xs mt-2 text-blue-300/70 leading-relaxed">هذه هي المرحلة الحالية لطلبك. سنقوم بتحديثها فور انتقالنا للمرحلة التالية.</p>}
+                                              {(isCompleted && !isCurrent) && <p className="text-xs mt-1 text-slate-500"><i className="ph ph-check"></i> تمت بنجاح</p>}
+                                          </div>
+                                      </div>
+                                  );
+                              })}
+                          </div>
+                      </div>
+                  </div>
+              );
+          }
+
+          // --- Normal Admin App ---
           const Navigation = () => {
             const navItems = [
               { id: 'dashboard', icon: <i className="ph ph-squares-four text-xl"></i>, label: 'الرئيسية (إضافة وبحث)' },
@@ -193,7 +306,7 @@
               { id: 'settings', icon: <i className="ph ph-gear text-xl"></i>, label: 'الإعدادات' },
             ];
             return (
-              <nav className="bg-slate-900/95 backdrop-blur-xl border-b border-slate-800 text-white sticky top-0 z-50 shadow-2xl">
+              <nav className="bg-slate-950/80 backdrop-blur-xl border-b border-slate-800 text-white sticky top-0 z-50 shadow-2xl">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                   <div className="flex justify-between items-center h-20">
                     <div className="flex items-center gap-3">
@@ -205,9 +318,9 @@
                         <span className="text-[10px] sm:text-xs text-slate-400 font-medium">نظام الإدارة الذكي</span>
                       </div>
                     </div>
-                    <div className="hidden lg:flex items-center space-x-1 space-x-reverse bg-slate-800/50 p-1.5 rounded-2xl border border-slate-700/50">
+                    <div className="hidden lg:flex items-center space-x-1 space-x-reverse bg-slate-900 p-1.5 rounded-2xl border border-slate-800">
                       {navItems.map(btn => (
-                        <button key={btn.id} onClick={() => setActiveTab(btn.id)} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === btn.id ? 'bg-yellow-500 text-slate-900 shadow-md' : 'text-slate-300 hover:text-white hover:bg-slate-700/50'}`}>
+                        <button key={btn.id} onClick={() => setActiveTab(btn.id)} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === btn.id ? 'bg-yellow-500 text-slate-900 shadow-md' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
                           {btn.icon}{btn.label}
                         </button>
                       ))}
@@ -247,6 +360,7 @@
                 total: total,
                 paid: paid,
                 remaining: total - paid,
+                status: 0, // 0 = تم التسجيل
                 month: new Date().getMonth() + 1,
                 year: new Date().getFullYear()
               };
@@ -262,85 +376,100 @@
               }
             };
 
+            const updateTxnStatus = async (txnId, newStatus) => {
+                const txnToUpdate = transactions.find(t => t.id === txnId);
+                if(txnToUpdate) {
+                    const updated = {...txnToUpdate, status: newStatus};
+                    await setDoc(doc(db, `artifacts/studio-marakby/public/data/transactions`, updated.id), updated);
+                }
+            };
+
             const filteredTxns = query ? transactions.filter(t => t.clientName.includes(query) || t.phone.includes(query) || t.receiptNo.toString().includes(query)) : [];
             const todaysTxns = transactions.filter(t => new Date(t.dateTime).toDateString() === new Date().toDateString());
 
             return (
               <div className="space-y-6">
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 items-center justify-between">
-                  <button onClick={() => setShowAddModal(true)} className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30">
+                <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800 flex flex-col md:flex-row gap-4 items-center justify-between">
+                  <button onClick={() => setShowAddModal(true)} className="w-full md:w-auto bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-900/50">
                     <i className="ph ph-plus-circle text-2xl"></i> إضافة عملية جديدة
                   </button>
                   <div className="relative w-full md:w-1/2">
-                    <i className="ph ph-magnifying-glass absolute right-4 top-4 text-slate-400 text-xl"></i>
-                    <input type="text" placeholder="ابحث بالاسم، رقم الهاتف، رقم الإيصال..." className="w-full p-3 pr-10 border-2 border-slate-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none text-lg" value={query} onChange={(e) => setQuery(e.target.value)} />
+                    <i className="ph ph-magnifying-glass absolute right-4 top-4 text-slate-500 text-xl"></i>
+                    <input type="text" placeholder="ابحث بالاسم، رقم الهاتف، رقم الإيصال..." className="w-full p-3 pr-10 border border-slate-700 bg-slate-950 text-white placeholder-slate-500 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-lg transition-colors" value={query} onChange={(e) => setQuery(e.target.value)} />
                   </div>
                 </div>
 
                 {query && (
-                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-                    <h3 className="text-lg font-bold text-slate-700 border-b pb-2">نتائج البحث ({filteredTxns.length})</h3>
-                    {filteredTxns.map(txn => <TransactionCard key={txn.id} txn={txn} onDelete={handleDelete} onPayRemaining={setPayModal} sendInvoice={() => openWhatsApp(txn.phone, generateWA_Message('invoice', txn))} />)}
+                  <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800 space-y-4">
+                    <h3 className="text-lg font-bold text-slate-300 border-b border-slate-800 pb-2">نتائج البحث ({filteredTxns.length})</h3>
+                    {filteredTxns.map(txn => <TransactionCard key={txn.id} txn={txn} onDelete={handleDelete} onPayRemaining={setPayModal} sendInvoice={() => openWhatsApp(txn.phone, generateWA_Message('invoice', txn))} updateStatus={updateTxnStatus} />)}
                   </div>
                 )}
 
                 {!query && (
-                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                    <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800 border-b pb-4">
-                      <i className="ph ph-files text-blue-500 text-2xl"></i> عمليات اليوم ({todaysTxns.length})
+                  <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
+                    <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-100 border-b border-slate-800 pb-4">
+                      <i className="ph ph-files text-blue-400 text-2xl"></i> عمليات اليوم ({todaysTxns.length})
                     </h2>
                     <div className="space-y-4">
-                      {todaysTxns.length === 0 ? <p className="text-center p-10 text-slate-500">لا توجد عمليات مسجلة اليوم.</p> : todaysTxns.map(txn => <TransactionCard key={txn.id} txn={txn} onDelete={handleDelete} onPayRemaining={setPayModal} sendInvoice={() => openWhatsApp(txn.phone, generateWA_Message('invoice', txn))} />)}
+                      {todaysTxns.length === 0 ? <p className="text-center p-10 text-slate-500">لا توجد عمليات مسجلة اليوم.</p> : todaysTxns.map(txn => <TransactionCard key={txn.id} txn={txn} onDelete={handleDelete} onPayRemaining={setPayModal} sendInvoice={() => openWhatsApp(txn.phone, generateWA_Message('invoice', txn))} updateStatus={updateTxnStatus} />)}
                     </div>
                   </div>
                 )}
 
                 {showAddModal && (
-                  <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar">
-                      <button onClick={() => setShowAddModal(false)} className="absolute top-4 left-4 p-2 text-slate-400 hover:text-red-500"><i className="ph ph-x text-2xl"></i></button>
-                      <h2 className="text-2xl font-black mb-6 text-slate-800 border-b pb-4">إضافة عملية جديدة</h2>
+                  <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-slate-900 p-6 rounded-3xl shadow-2xl border border-slate-800 w-full max-w-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+                      <button onClick={() => setShowAddModal(false)} className="absolute top-4 left-4 p-2 text-slate-500 hover:text-red-400"><i className="ph ph-x text-2xl"></i></button>
+                      <h2 className="text-2xl font-black mb-6 text-slate-100 border-b border-slate-800 pb-4">إضافة عملية جديدة</h2>
                       <form onSubmit={handleSubmit} className="space-y-5">
-                        <div className="bg-blue-50 p-4 rounded-xl flex justify-between items-center text-sm font-bold text-blue-800 border border-blue-100">
+                        <div className="bg-blue-900/30 p-4 rounded-xl flex justify-between items-center text-sm font-bold text-blue-300 border border-blue-800/50">
                           <span>رقم الإيصال التلقائي:</span><span className="text-xl">#{settings.nextReceiptNo}</span>
                         </div>
-                        <input type="text" placeholder="اسم العميل" required className="w-full p-4 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none" value={formData.clientName} onChange={e => setFormData({...formData, clientName: e.target.value})} />
+                        <input type="text" placeholder="اسم العميل" required className="w-full p-4 border border-slate-700 bg-slate-950 text-white placeholder-slate-500 rounded-xl focus:border-blue-500 outline-none" value={formData.clientName} onChange={e => setFormData({...formData, clientName: e.target.value})} />
                         <div className="flex gap-4">
-                          <input type="tel" placeholder="رقم الهاتف" required className="w-full p-4 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
-                          <input type="text" placeholder="رقم الصورة" className="w-1/2 p-4 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none" value={formData.photoNo} onChange={e => setFormData({...formData, photoNo: e.target.value})} />
+                          <input type="tel" placeholder="رقم الهاتف" required className="w-full p-4 border border-slate-700 bg-slate-950 text-white placeholder-slate-500 rounded-xl focus:border-blue-500 outline-none" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                          <input type="text" placeholder="رقم الصورة" className="w-1/2 p-4 border border-slate-700 bg-slate-950 text-white placeholder-slate-500 rounded-xl focus:border-blue-500 outline-none" value={formData.photoNo} onChange={e => setFormData({...formData, photoNo: e.target.value})} />
                         </div>
-                        <div className="bg-slate-50 p-4 rounded-xl">
-                          <label className="text-sm font-bold text-slate-700 mb-3 block">الخدمات السريعة:</label>
-                          <div className="flex flex-wrap gap-2 mb-3">
-                            {settings.services.map((srv, idx) => (
-                              <span key={idx} onClick={() => handleAddService(srv)} className="bg-white text-blue-700 text-sm px-3 py-1.5 rounded-full cursor-pointer hover:bg-blue-600 hover:text-white border border-blue-200 transition-all shadow-sm">
-                                {srv.name} <span className="text-xs opacity-70">({srv.price} ج.م)</span>
-                              </span>
-                            ))}
+                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                          <label className="text-sm font-bold text-slate-400 mb-3 block">الخدمات السريعة:</label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                            {settings.services.map((srv, idx) => {
+                              const srvObj = typeof srv === 'string' ? {name: srv, price: 0, desc: ''} : srv;
+                              return (
+                              <div key={idx} onClick={() => handleAddService(srvObj)}
+                                className="bg-slate-900 p-3 rounded-xl cursor-pointer hover:bg-slate-800 hover:border-blue-500/50 border border-slate-800 transition-all shadow-sm flex flex-col gap-1 group">
+                                <div className="flex justify-between items-start">
+                                  <span className="text-blue-400 text-sm font-bold group-hover:text-blue-300">{srvObj.name}</span>
+                                  {srvObj.price > 0 && <span className="text-xs bg-slate-950 px-2 py-1 rounded-md text-blue-300 font-black">{srvObj.price} ج.م</span>}
+                                </div>
+                                {srvObj.desc && <span className="text-xs text-slate-500 mt-1 leading-relaxed">{srvObj.desc}</span>}
+                              </div>
+                            )})}
                           </div>
-                          <textarea placeholder="المطلوب بالتفصيل..." required rows="3" className="w-full p-4 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none" value={formData.requirements} onChange={e => setFormData({...formData, requirements: e.target.value})} />
+                          <textarea placeholder="المطلوب بالتفصيل..." required rows="3" className="w-full p-4 border border-slate-700 bg-slate-900 text-white placeholder-slate-500 rounded-xl focus:border-blue-500 outline-none" value={formData.requirements} onChange={e => setFormData({...formData, requirements: e.target.value})} />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
-                          <input type="number" placeholder="الإجمالي" required className="p-4 border-2 border-slate-200 rounded-xl outline-none" value={formData.total} onChange={e => setFormData({...formData, total: e.target.value})} />
-                          <input type="number" placeholder="المدفوع" required className="p-4 border-2 border-slate-200 rounded-xl outline-none" value={formData.paid} onChange={e => setFormData({...formData, paid: e.target.value})} />
+                          <input type="number" placeholder="الإجمالي" required className="p-4 border border-slate-700 bg-slate-950 text-white rounded-xl outline-none focus:border-blue-500" value={formData.total} onChange={e => setFormData({...formData, total: e.target.value})} />
+                          <input type="number" placeholder="المدفوع" required className="p-4 border border-slate-700 bg-slate-950 text-white rounded-xl outline-none focus:border-green-500" value={formData.paid} onChange={e => setFormData({...formData, paid: e.target.value})} />
                         </div>
-                        <div className={`p-4 rounded-xl text-center font-black text-xl ${(formData.total - formData.paid) > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                        <div className={`p-4 rounded-xl text-center font-black text-xl border ${(formData.total - formData.paid) > 0 ? 'bg-red-950/40 text-red-400 border-red-900/50' : 'bg-green-950/40 text-green-400 border-green-900/50'}`}>
                           الباقي: {formatCurrency((formData.total || 0) - (formData.paid || 0))}
                         </div>
-                        <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-xl shadow-lg"><i className="ph ph-floppy-disk text-2xl ml-2"></i>حفظ الإيصال</button>
+                        <button type="submit" className="w-full bg-blue-600 text-white hover:bg-blue-500 font-black py-4 rounded-xl shadow-lg"><i className="ph ph-floppy-disk text-2xl ml-2 align-middle"></i>حفظ الإيصال</button>
                       </form>
                     </div>
                   </div>
                 )}
                 
                 {payModal && (
-                  <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white p-6 rounded-3xl shadow-xl w-full max-w-md relative">
-                      <button onClick={() => setPayModal(null)} className="absolute top-4 left-4 p-2 text-slate-400 hover:text-red-500"><i className="ph ph-x text-2xl"></i></button>
-                      <h3 className="text-2xl font-black mb-4 border-b pb-4">سداد باقي الحساب</h3>
-                      <div className="mb-6 bg-slate-50 p-4 rounded-xl space-y-2">
-                        <p>العميل: <b>{payModal.clientName}</b></p>
-                        <p className="text-red-600 font-bold">الباقي: {payModal.remaining} ج.م</p>
+                  <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-slate-900 p-6 rounded-3xl shadow-xl border border-slate-800 w-full max-w-md relative">
+                      <button onClick={() => setPayModal(null)} className="absolute top-4 left-4 p-2 text-slate-500 hover:text-red-400"><i className="ph ph-x text-2xl"></i></button>
+                      <h3 className="text-2xl font-black mb-4 border-b border-slate-800 pb-4 text-slate-100">سداد باقي الحساب</h3>
+                      <div className="mb-6 bg-slate-950 p-4 rounded-xl space-y-2 border border-slate-800">
+                        <p className="text-slate-300">العميل: <b className="text-white">{payModal.clientName}</b></p>
+                        <p className="text-red-400 font-bold">الباقي: {payModal.remaining} ج.م</p>
                       </div>
                       <form onSubmit={async (e) => {
                         e.preventDefault();
@@ -349,8 +478,8 @@
                         await setDoc(doc(db, `artifacts/studio-marakby/public/data/transactions`, updated.id), updated);
                         setPayModal(null);
                       }} className="space-y-4">
-                        <input type="number" name="amount" required min="1" max={payModal.remaining} defaultValue={payModal.remaining} className="w-full p-4 border-2 border-slate-200 rounded-xl text-2xl font-black text-center outline-none focus:border-green-500"/>
-                        <button type="submit" className="w-full bg-green-500 text-white font-black py-4 rounded-xl">تأكيد التحصيل</button>
+                        <input type="number" name="amount" required min="1" max={payModal.remaining} defaultValue={payModal.remaining} className="w-full p-4 border border-slate-700 bg-slate-950 text-white rounded-xl text-2xl font-black text-center outline-none focus:border-green-500"/>
+                        <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-4 rounded-xl">تأكيد التحصيل</button>
                       </form>
                     </div>
                   </div>
@@ -359,44 +488,70 @@
             );
           };
 
-          const TransactionCard = ({ txn, onDelete, onPayRemaining, sendInvoice }) => {
+          const TransactionCard = ({ txn, onDelete, onPayRemaining, sendInvoice, updateStatus }) => {
             const [showWaMenu, setShowWaMenu] = useState(false);
+            const currentStatus = txn.status || 0;
+
             return (
-              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col sm:flex-row gap-4 justify-between hover:shadow-md transition-all">
-                <div className="flex-1 space-y-2">
-                  <div className="flex justify-between items-start">
-                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><i className="ph ph-user-circle text-slate-400 text-2xl"></i> {txn.clientName}</h3>
-                    <span className="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded border border-slate-200 font-mono">#{txn.receiptNo}</span>
+              <div className="bg-slate-900 p-5 rounded-2xl shadow-sm border border-slate-800 flex flex-col md:flex-row gap-6 justify-between hover:border-slate-700 transition-all">
+                <div className="flex-1 flex flex-col justify-between">
+                  <div className="space-y-3">
+                      <div className="flex justify-between items-start">
+                        <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2"><i className="ph ph-user-circle text-slate-500 text-2xl"></i> {txn.clientName}</h3>
+                        <span className="bg-slate-800 text-slate-400 text-xs px-2 py-1 rounded border border-slate-700 font-mono">#{txn.receiptNo}</span>
+                      </div>
+                      <div className="text-sm text-slate-400 flex flex-wrap gap-x-4">
+                        <span>📞 {txn.phone}</span>
+                        <span>⏱️ {formatDate(txn.dateTime)}</span>
+                      </div>
+                      <div className="bg-slate-950 p-3 rounded-lg text-sm text-slate-300 border border-slate-800"><strong>المطلوب:</strong> {txn.requirements}</div>
+                      
+                      <div className="flex gap-4 pt-3 border-t border-slate-800 text-sm">
+                        <span className="text-slate-300">الإجمالي: <b className="text-white">{txn.total}</b></span>
+                        <span className="text-green-400">المدفوع: <b className="text-green-300">{txn.paid}</b></span>
+                        <span className={txn.remaining > 0 ? "text-red-400" : "text-green-400"}>الباقي: <b>{txn.remaining}</b></span>
+                      </div>
                   </div>
-                  <div className="text-sm text-slate-500 flex flex-wrap gap-x-4">
-                    <span>📞 {txn.phone}</span>
-                    <span>⏱️ {formatDate(txn.dateTime)}</span>
-                  </div>
-                  <div className="bg-slate-50 p-2 rounded text-sm text-slate-700 border border-slate-100"><strong>المطلوب:</strong> {txn.requirements}</div>
-                  <div className="flex gap-4 pt-2 border-t mt-2 text-sm">
-                    <span>الإجمالي: <b>{txn.total}</b></span>
-                    <span className="text-green-600">المدفوع: <b>{txn.paid}</b></span>
-                    <span className={txn.remaining > 0 ? "text-red-500" : "text-green-500"}>الباقي: <b>{txn.remaining}</b></span>
+
+                  {/* Track Status Modifier */}
+                  <div className="mt-5 pt-4 border-t border-slate-800">
+                    <h4 className="text-xs font-bold text-slate-400 mb-3">تحديث حالة الطلب (التتبع):</h4>
+                    <div className="flex gap-2">
+                        {ORDER_STATUSES.map(s => (
+                            <button
+                                key={s.id}
+                                onClick={() => updateStatus(txn.id, s.id)}
+                                className={`flex-1 py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center gap-1 border ${currentStatus === s.id ? s.activeClass : s.inactiveClass}`}
+                            >
+                                <i className={`ph ${s.icon} text-lg`}></i>
+                                <span className="text-[10px] sm:text-xs text-center">{s.label}</span>
+                            </button>
+                        ))}
+                    </div>
                   </div>
                 </div>
-                <div className="flex sm:flex-col gap-2 min-w-[140px]">
-                  <button onClick={sendInvoice} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-sm">
+
+                <div className="flex flex-col gap-2 min-w-[160px] justify-start border-t md:border-t-0 md:border-r border-slate-800 pt-4 md:pt-0 md:pr-6">
+                  <button onClick={sendInvoice} className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-sm">
                     <i className="ph ph-receipt text-xl"></i> إرسال الفاتورة
                   </button>
+                  
                   <div className="relative w-full">
-                    <button onClick={() => setShowWaMenu(!showWaMenu)} className="w-full bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all">
-                      <i className="ph ph-whatsapp-logo text-xl"></i> واتساب
+                    <button onClick={() => setShowWaMenu(!showWaMenu)} className="w-full bg-green-600 hover:bg-green-500 text-white px-3 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all">
+                      <i className="ph ph-whatsapp-logo text-xl"></i> رسائل واتساب
                     </button>
                     {showWaMenu && (
-                      <div className="absolute right-0 mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-xl z-10 p-1 flex flex-col">
-                        <button onClick={() => {openWhatsApp(txn.phone, generateWA_Message('welcome', txn)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm hover:bg-slate-50 rounded">👋 رسالة ترحيب</button>
-                        <button onClick={() => {openWhatsApp(txn.phone, generateWA_Message('ready', txn)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm hover:bg-slate-50 rounded">🎉 الشغل خلص</button>
-                        <button onClick={() => {openWhatsApp(txn.phone, generateWA_Message('reminder', txn)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm hover:bg-slate-50 rounded">⚠️ تذكير بالباقي</button>
+                      <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-10 p-1 flex flex-col overflow-hidden">
+                        <button onClick={() => {openWhatsApp(txn.phone, generateWA_Message('tracking', txn)); setShowWaMenu(false);}} className="text-right px-3 py-2.5 text-sm text-blue-300 hover:bg-slate-700 font-bold border-b border-slate-700">📍 رابط التتبع للعميل</button>
+                        <button onClick={() => {openWhatsApp(txn.phone, generateWA_Message('welcome', txn)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-slate-200 hover:bg-slate-700">👋 رسالة ترحيب</button>
+                        <button onClick={() => {openWhatsApp(txn.phone, generateWA_Message('ready', txn)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-slate-200 hover:bg-slate-700">🎉 الشغل خلص</button>
+                        <button onClick={() => {openWhatsApp(txn.phone, generateWA_Message('reminder', txn)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-slate-200 hover:bg-slate-700">⚠️ تذكير بالباقي</button>
                       </div>
                     )}
                   </div>
-                  {txn.remaining > 0 && <button onClick={() => onPayRemaining(txn)} className="bg-yellow-500 hover:bg-yellow-600 text-slate-900 px-3 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-sm"><i className="ph ph-credit-card text-xl"></i> سداد الباقي</button>}
-                  <button onClick={() => onDelete(txn.id)} className="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all sm:mt-auto"><i className="ph ph-trash text-xl"></i> حذف</button>
+
+                  {txn.remaining > 0 && <button onClick={() => onPayRemaining(txn)} className="bg-yellow-500 hover:bg-yellow-400 text-slate-900 px-3 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-sm"><i className="ph ph-credit-card text-xl"></i> سداد الباقي</button>}
+                  <button onClick={() => onDelete(txn.id)} className="bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-900/30 px-3 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all mt-auto"><i className="ph ph-trash text-xl"></i> حذف الإيصال</button>
                 </div>
               </div>
             );
@@ -413,24 +568,24 @@
             const todaysExpenses = expenses.filter(e => new Date(e.date).toDateString() === new Date().toDateString());
             return (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-fit">
-                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800 border-b pb-4"><i className="ph ph-money text-red-500"></i> تسجيل مصروفات</h2>
+                <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800 h-fit">
+                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-100 border-b border-slate-800 pb-4"><i className="ph ph-money text-red-400"></i> تسجيل مصروفات</h2>
                   <form onSubmit={handleAddExpense} className="space-y-4">
-                    <input type="number" required placeholder="المبلغ" value={expData.amount} onChange={e => setExpData({...expData, amount: e.target.value})} className="w-full p-3 border rounded-lg outline-none text-red-600 font-bold" />
-                    <select value={expData.category} onChange={e => setExpData({...expData, category: e.target.value})} className="w-full p-3 border rounded-lg outline-none">
+                    <input type="number" required placeholder="المبلغ" value={expData.amount} onChange={e => setExpData({...expData, amount: e.target.value})} className="w-full p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none focus:border-red-500 font-bold" />
+                    <select value={expData.category} onChange={e => setExpData({...expData, category: e.target.value})} className="w-full p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none focus:border-red-500">
                       {settings.expenseCategories.map((cat, idx) => <option key={idx} value={cat}>{cat}</option>)}
                     </select>
-                    <input type="text" placeholder="ملاحظات" value={expData.notes} onChange={e => setExpData({...expData, notes: e.target.value})} className="w-full p-3 border rounded-lg outline-none" />
-                    <button type="submit" className="w-full bg-red-500 text-white font-bold py-3 rounded-lg shadow-md hover:bg-red-600 transition-all">إضافة المصروف</button>
+                    <input type="text" placeholder="ملاحظات" value={expData.notes} onChange={e => setExpData({...expData, notes: e.target.value})} className="w-full p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none focus:border-red-500 placeholder-slate-500" />
+                    <button type="submit" className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg shadow-md transition-all">إضافة المصروف</button>
                   </form>
                 </div>
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                  <h2 className="text-xl font-bold mb-4 flex justify-between text-slate-800 border-b pb-4"><span>مصروفات اليوم</span><span className="text-red-500 text-sm">{formatCurrency(todaysExpenses.reduce((s,e)=>s+e.amount,0))}</span></h2>
+                <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
+                  <h2 className="text-xl font-bold mb-4 flex justify-between text-slate-100 border-b border-slate-800 pb-4"><span>مصروفات اليوم</span><span className="text-red-400 text-sm">{formatCurrency(todaysExpenses.reduce((s,e)=>s+e.amount,0))}</span></h2>
                   <div className="space-y-3">
                     {todaysExpenses.map(exp => (
-                      <div key={exp.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100">
-                        <div><p className="font-bold">{exp.category} <span className="text-red-500 mr-2">{exp.amount} ج.م</span></p><p className="text-xs text-slate-500">{exp.notes}</p></div>
-                        <button onClick={async () => await deleteDoc(doc(db, `artifacts/studio-marakby/public/data/expenses`, exp.id))} className="text-slate-400 hover:text-red-500"><i className="ph ph-trash text-lg"></i></button>
+                      <div key={exp.id} className="flex justify-between items-center p-3 bg-slate-950 rounded-lg border border-slate-800">
+                        <div><p className="font-bold text-slate-200">{exp.category} <span className="text-red-400 mr-2">{exp.amount} ج.م</span></p><p className="text-xs text-slate-500 mt-1">{exp.notes}</p></div>
+                        <button onClick={async () => await deleteDoc(doc(db, `artifacts/studio-marakby/public/data/expenses`, exp.id))} className="text-slate-500 hover:text-red-400 p-2"><i className="ph ph-trash text-lg"></i></button>
                       </div>
                     ))}
                   </div>
@@ -455,11 +610,11 @@
 
             return (
               <div className="space-y-6">
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end justify-between">
-                  <h2 className="text-xl font-bold flex items-center gap-2 text-slate-800"><i className="ph ph-calendar-blank text-blue-500 text-2xl"></i> تقارير شهرية</h2>
+                <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800 flex flex-wrap gap-4 items-end justify-between">
+                  <h2 className="text-xl font-bold flex items-center gap-2 text-slate-100"><i className="ph ph-calendar-blank text-blue-400 text-2xl"></i> تقارير شهرية</h2>
                   <div className="flex gap-2">
-                    <select value={filter.month} onChange={e => setFilter({...filter, month: e.target.value})} className="p-2 border rounded-lg bg-slate-50">{Array.from({length: 12}, (_, i) => i + 1).map(m => <option key={m} value={m}>شهر {m}</option>)}</select>
-                    <select value={filter.year} onChange={e => setFilter({...filter, year: e.target.value})} className="p-2 border rounded-lg bg-slate-50">{[currentYear-1, currentYear, currentYear+1].map(y => <option key={y} value={y}>{y}</option>)}</select>
+                    <select value={filter.month} onChange={e => setFilter({...filter, month: e.target.value})} className="p-2 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none">{Array.from({length: 12}, (_, i) => i + 1).map(m => <option key={m} value={m}>شهر {m}</option>)}</select>
+                    <select value={filter.year} onChange={e => setFilter({...filter, year: e.target.value})} className="p-2 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none">{[currentYear-1, currentYear, currentYear+1].map(y => <option key={y} value={y}>{y}</option>)}</select>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -468,29 +623,30 @@
                   <StatCard title="صافي الربح" value={stats.net} color={stats.net >= 0 ? "emerald" : "rose"} highlight />
                   <StatCard title="باقي الحسابات (ديون)" value={stats.totalDebts} color="blue" />
                 </div>
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mt-6">
-                  <h3 className="text-lg font-bold text-red-600 mb-4 border-b pb-2">تفاصيل الديون المستحقة</h3>
+                <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800 mt-6">
+                  <h3 className="text-lg font-bold text-red-400 mb-4 border-b border-slate-800 pb-2">تفاصيل الديون المستحقة</h3>
                   <div className="space-y-3">
                     {filteredTxns.filter(t => t.remaining > 0).map(txn => (
-                      <div key={txn.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 bg-red-50 rounded-xl border border-red-100 gap-4">
-                        <div><span className="font-bold text-slate-800">{txn.clientName}</span><div className="text-xs text-slate-500">📞 {txn.phone} | إيصال #{txn.receiptNo}</div></div>
+                      <div key={txn.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 bg-red-950/20 rounded-xl border border-red-900/30 gap-4">
+                        <div><span className="font-bold text-slate-200">{txn.clientName}</span><div className="text-xs text-slate-400 mt-1">📞 {txn.phone} | إيصال #{txn.receiptNo}</div></div>
                         <div className="flex items-center gap-3 w-full sm:w-auto">
-                          <span className="text-red-600 font-black ml-4">{txn.remaining} ج.م</span>
-                          <button onClick={() => openWhatsApp(txn.phone, `مرحباً أ. ${txn.clientName} 🌟\nتذكير بمبلغ متبقي لحسابكم في ${settings.studioName} بقيمة ${txn.remaining} ج.م.\nيمكن التحويل فودافون كاش أو إنستاباي على رقم: 01126810107`)} className="bg-green-500 text-white px-3 py-2 rounded-lg text-xs font-bold"><i className="ph ph-whatsapp-logo text-lg"></i></button>
-                          <button onClick={() => setPayModal(txn)} className="bg-yellow-500 text-slate-900 px-3 py-2 rounded-lg text-xs font-bold">سداد</button>
+                          <span className="text-red-400 font-black ml-4">{txn.remaining} ج.م</span>
+                          <button onClick={() => openWhatsApp(txn.phone, `مرحباً أ. ${txn.clientName} 🌟\nتذكير بمبلغ متبقي لحسابكم في ${settings.studioName} بقيمة ${txn.remaining} ج.م.\nيمكن التحويل فودافون كاش أو إنستاباي على رقم: 01126810107`)} className="bg-green-600 hover:bg-green-500 text-white px-3 py-2 rounded-lg text-xs font-bold transition-colors"><i className="ph ph-whatsapp-logo text-lg"></i></button>
+                          <button onClick={() => setPayModal(txn)} className="bg-yellow-500 hover:bg-yellow-400 text-slate-900 px-3 py-2 rounded-lg text-xs font-bold transition-colors">سداد</button>
                         </div>
                       </div>
                     ))}
+                    {filteredTxns.filter(t => t.remaining > 0).length === 0 && <p className="text-slate-500 text-sm">لا توجد ديون مستحقة لهذا الشهر.</p>}
                   </div>
                 </div>
                 {payModal && (
-                   <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white p-6 rounded-3xl shadow-xl w-full max-w-md relative">
-                      <button onClick={() => setPayModal(null)} className="absolute top-4 left-4 p-2 text-slate-400 hover:text-red-500"><i className="ph ph-x text-2xl"></i></button>
-                      <h3 className="text-2xl font-black mb-4 border-b pb-4 text-center">سداد باقي الحساب</h3>
-                      <div className="mb-6 bg-slate-50 p-4 rounded-xl text-center">
-                        <p>العميل: <b className="text-lg">{payModal.clientName}</b></p>
-                        <p className="text-red-600 font-bold">الباقي المستحق: {payModal.remaining} ج.م</p>
+                   <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-slate-900 p-6 rounded-3xl shadow-xl border border-slate-800 w-full max-w-md relative">
+                      <button onClick={() => setPayModal(null)} className="absolute top-4 left-4 p-2 text-slate-500 hover:text-red-400"><i className="ph ph-x text-2xl"></i></button>
+                      <h3 className="text-2xl font-black mb-4 border-b border-slate-800 pb-4 text-center text-slate-100">سداد باقي الحساب</h3>
+                      <div className="mb-6 bg-slate-950 p-4 rounded-xl text-center border border-slate-800">
+                        <p className="text-slate-300">العميل: <b className="text-white text-lg">{payModal.clientName}</b></p>
+                        <p className="text-red-400 font-bold mt-2">الباقي المستحق: {payModal.remaining} ج.م</p>
                       </div>
                       <form onSubmit={async (e) => {
                         e.preventDefault();
@@ -499,8 +655,8 @@
                         await setDoc(doc(db, `artifacts/studio-marakby/public/data/transactions`, updated.id), updated);
                         setPayModal(null);
                       }} className="space-y-4">
-                        <input type="number" name="amount" required min="1" max={payModal.remaining} defaultValue={payModal.remaining} className="w-full p-4 border-2 border-slate-200 rounded-xl text-2xl font-black text-center outline-none focus:border-green-500 shadow-inner"/>
-                        <button type="submit" className="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-xl shadow-lg transition-all text-lg">تأكيد تحصيل المبلغ</button>
+                        <input type="number" name="amount" required min="1" max={payModal.remaining} defaultValue={payModal.remaining} className="w-full p-4 border border-slate-700 bg-slate-950 text-white rounded-xl text-2xl font-black text-center outline-none focus:border-green-500 shadow-inner"/>
+                        <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-4 rounded-xl shadow-lg transition-all text-lg">تأكيد تحصيل المبلغ</button>
                       </form>
                     </div>
                   </div>
@@ -510,10 +666,16 @@
           };
 
           const StatCard = ({title, value, color, highlight}) => {
-            const colors = { green: "bg-green-50 text-green-700 border-green-200", red: "bg-red-50 text-red-700 border-red-200", blue: "bg-blue-50 text-blue-700 border-blue-200", emerald: "bg-emerald-500 text-white border-emerald-600", rose: "bg-rose-500 text-white border-rose-600" };
+            const colors = { 
+                green: "bg-green-950/30 text-green-400 border-green-900/50", 
+                red: "bg-red-950/30 text-red-400 border-red-900/50", 
+                blue: "bg-blue-950/30 text-blue-400 border-blue-900/50", 
+                emerald: "bg-emerald-600 text-white border-emerald-500", 
+                rose: "bg-rose-600 text-white border-rose-500" 
+            };
             return (
               <div className={`p-5 rounded-2xl border ${colors[color]} ${highlight ? 'shadow-lg scale-105' : ''}`}>
-                <h4 className="text-xs opacity-80 mb-1">{title}</h4>
+                <h4 className="text-xs opacity-80 mb-2">{title}</h4>
                 <div className="text-xl sm:text-2xl font-black">{formatCurrency(value)}</div>
               </div>
             );
@@ -524,15 +686,15 @@
             const handleRemoveList = (key, idx) => { const newList = [...settings[key]]; newList.splice(idx, 1); setSettings({...settings, [key]: newList}); };
             return (
               <div className="space-y-8">
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2 border-b pb-4"><i className="ph ph-image text-purple-500"></i> هوية الاستوديو</h2>
+                <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
+                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2 border-b border-slate-800 pb-4 text-slate-100"><i className="ph ph-image text-purple-400"></i> هوية الاستوديو</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block font-bold text-sm text-slate-600 mb-2">اسم الاستوديو:</label>
-                      <input type="text" value={settings.studioName} onChange={e => setSettings({...settings, studioName: e.target.value})} className="w-full p-3 border-2 border-slate-200 rounded-lg focus:border-purple-500 outline-none" />
+                      <label className="block font-bold text-sm text-slate-400 mb-2">اسم الاستوديو:</label>
+                      <input type="text" value={settings.studioName} onChange={e => setSettings({...settings, studioName: e.target.value})} className="w-full p-3 border border-slate-700 bg-slate-950 text-white rounded-lg focus:border-purple-500 outline-none" />
                     </div>
                     <div>
-                      <label className="block font-bold text-sm text-slate-600 mb-2">الشعار (Logo):</label>
+                      <label className="block font-bold text-sm text-slate-400 mb-2">الشعار (Logo):</label>
                       <input type="file" accept="image/*" onChange={e => {
                         const file = e.target.files[0];
                         if (file) {
@@ -540,34 +702,37 @@
                           reader.onloadend = () => setSettings({...settings, studioLogo: reader.result});
                           reader.readAsDataURL(file);
                         }
-                      }} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100" />
+                      }} className="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-slate-800 file:text-purple-400 hover:file:bg-slate-700 transition-colors" />
                     </div>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                    <ServicesSettingsList title="قوالب الخدمات والأسعار" items={settings.services} onAdd={v => handleAddList('services', v)} onRemove={i => handleRemoveList('services', i)} />
-                   <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                      <h3 className="font-bold mb-4 border-b pb-2">أقسام المصروفات</h3>
+                   <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
+                      <h3 className="font-bold mb-4 border-b border-slate-800 pb-2 text-slate-100">أقسام المصروفات</h3>
                       <div className="flex gap-2 mb-4">
-                        <input type="text" id="newCat" className="flex-1 p-2 border-2 rounded-lg outline-none" placeholder="بند مصروف جديد..." />
-                        <button onClick={() => { const v = document.getElementById('newCat').value; handleAddList('expenseCategories', v); document.getElementById('newCat').value=''; }} className="bg-blue-600 text-white px-4 rounded-lg"><i className="ph ph-plus text-xl"></i></button>
+                        <input type="text" id="newCat" className="flex-1 p-2 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none focus:border-blue-500 placeholder-slate-500" placeholder="بند مصروف جديد..." />
+                        <button onClick={() => { const v = document.getElementById('newCat').value; handleAddList('expenseCategories', v); document.getElementById('newCat').value=''; }} className="bg-blue-600 hover:bg-blue-500 text-white px-4 rounded-lg transition-colors"><i className="ph ph-plus text-xl"></i></button>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {settings.expenseCategories.map((c, i) => (
-                          <span key={i} className="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full text-sm font-bold flex items-center gap-2">
-                            {c} <button onClick={() => handleRemoveList('expenseCategories', i)} className="text-red-400 hover:text-red-600"><i className="ph ph-x text-sm"></i></button>
+                          <span key={i} className="bg-slate-800 text-slate-300 px-3 py-1.5 rounded-full text-sm font-bold flex items-center gap-2 border border-slate-700">
+                            {c} <button onClick={() => handleRemoveList('expenseCategories', i)} className="text-red-400 hover:text-red-300"><i className="ph ph-x text-sm"></i></button>
                           </span>
                         ))}
                       </div>
                    </div>
                 </div>
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                  <h2 className="text-xl font-bold mb-4 border-b pb-4"><i className="ph ph-whatsapp-logo text-green-500"></i> قوالب رسائل الواتساب</h2>
+                <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
+                  <h2 className="text-xl font-bold mb-4 border-b border-slate-800 pb-4 text-slate-100"><i className="ph ph-whatsapp-logo text-green-400"></i> قوالب رسائل الواتساب</h2>
                   <div className="space-y-4">
                     {Object.keys(settings.waTemplates).map(key => (
                       <div key={key}>
-                        <label className="block text-sm font-bold mb-1 text-slate-600">{key === 'invoice' ? 'شكل الفاتورة الإلكترونية' : key}</label>
-                        <textarea rows="3" value={settings.waTemplates[key]} onChange={e => setSettings({...settings, waTemplates: {...settings.waTemplates, [key]: e.target.value}})} className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-green-500 outline-none text-sm font-mono" />
+                        <label className="block text-sm font-bold mb-2 text-slate-400">
+                            {key === 'invoice' ? 'شكل الفاتورة الإلكترونية' : 
+                             key === 'tracking' ? 'رسالة تتبع الطلب (يرسل معها الرابط تلقائياً)' : key}
+                        </label>
+                        <textarea rows="3" value={settings.waTemplates[key]} onChange={e => setSettings({...settings, waTemplates: {...settings.waTemplates, [key]: e.target.value}})} className="w-full p-4 border border-slate-700 bg-slate-950 text-slate-300 rounded-xl focus:border-green-500 outline-none text-sm font-mono custom-scrollbar" />
                       </div>
                     ))}
                   </div>
@@ -579,37 +744,54 @@
           const ServicesSettingsList = ({title, items, onAdd, onRemove}) => {
             const [newName, setNewName] = useState('');
             const [newPrice, setNewPrice] = useState('');
+            const [newDesc, setNewDesc] = useState('');
             return (
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <h3 className="font-bold text-slate-800 mb-4 border-b pb-2">{title}</h3>
-                <div className="flex gap-2 mb-4">
-                  <input type="text" value={newName} onChange={e=>setNewName(e.target.value)} className="flex-1 p-2 border-2 border-slate-200 rounded-lg outline-none" placeholder="الخدمة..."/>
-                  <input type="number" value={newPrice} onChange={e=>setNewPrice(e.target.value)} className="w-20 p-2 border-2 border-slate-200 rounded-lg outline-none" placeholder="السعر"/>
-                  <button onClick={()=>{if(newName){onAdd({name:newName, price:parseFloat(newPrice)||0});setNewName('');setNewPrice('');}}} className="bg-blue-600 text-white px-4 rounded-lg transition-colors"><i className="ph ph-plus text-xl"></i></button>
+              <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
+                <h3 className="font-bold text-slate-100 mb-4 border-b border-slate-800 pb-2">{title}</h3>
+                <div className="flex flex-col gap-3 mb-5">
+                  <div className="flex gap-2">
+                    <input type="text" value={newName} onChange={e=>setNewName(e.target.value)} className="flex-1 p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none focus:border-blue-500 placeholder-slate-500 text-sm" placeholder="اسم الخدمة..."/>
+                    <input type="number" value={newPrice} onChange={e=>setNewPrice(e.target.value)} className="w-24 p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none focus:border-blue-500 placeholder-slate-500 text-sm" placeholder="السعر..."/>
+                  </div>
+                  <div className="flex gap-2">
+                    <input type="text" value={newDesc} onChange={e=>setNewDesc(e.target.value)} className="flex-1 p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none focus:border-blue-500 placeholder-slate-500 text-sm" placeholder="تفاصيل صغيرة تحت الخدمة (اختياري)..."/>
+                    <button onClick={()=>{if(newName){onAdd({name:newName, price:parseFloat(newPrice)||0, desc:newDesc});setNewName('');setNewPrice('');setNewDesc('');}}} className="bg-blue-600 hover:bg-blue-500 text-white px-5 rounded-lg transition-colors flex items-center justify-center"><i className="ph ph-plus text-xl"></i></button>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {items.map((item, idx) => (
-                    <span key={idx} className="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full text-sm font-bold flex items-center gap-2 border border-slate-200">
-                      {item.name} <span className="text-xs text-blue-600">({item.price} ج.م)</span>
-                      <button onClick={()=>onRemove(idx)} className="text-red-400 hover:text-red-600 bg-white rounded-full px-1.5"><i className="ph ph-x text-sm"></i></button>
-                    </span>
-                  ))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {items.map((item, idx) => {
+                    const srv = typeof item === 'string' ? {name: item, price: 0, desc: ''} : item;
+                    return (
+                    <div key={idx} className="bg-slate-800 p-3 rounded-xl flex justify-between items-start border border-slate-700">
+                      <div className="flex flex-col">
+                        <span className="text-slate-300 text-sm font-bold flex items-center gap-2">
+                          {srv.name} {srv.price > 0 && <span className="text-xs bg-slate-950 px-1.5 py-0.5 rounded text-blue-400">{srv.price} ج.م</span>}
+                        </span>
+                        {srv.desc && <span className="text-xs text-slate-500 mt-1">{srv.desc}</span>}
+                      </div>
+                      <button onClick={()=>onRemove(idx)} className="text-red-400 hover:text-red-300 bg-transparent rounded-full mr-2"><i className="ph ph-x text-base"></i></button>
+                    </div>
+                  )})}
                 </div>
               </div>
             );
           };
 
-          if (!authReady) return <div className="min-h-screen flex flex-col items-center justify-center"><div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div><p className="font-bold">جاري المزامنة مع السحابة...</p></div>;
+          if (!authReady) return <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-100"><div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div><p className="font-bold">جاري المزامنة مع السحابة...</p></div>;
 
           return (
-            <div className="min-h-screen bg-slate-50 text-slate-900 pb-20">
-              {authError && <div className="bg-red-500 text-white text-center py-1 font-bold text-xs">{authError}</div>}
-              <Navigation />
-              <main className="max-w-7xl mx-auto p-4 md:p-6">
-                {activeTab === 'dashboard' && <DashboardTab />}
-                {activeTab === 'expenses' && <ExpensesTab />}
-                {activeTab === 'reports' && <ReportsTab />}
-                {activeTab === 'settings' && <SettingsTab />}
+            <div className="min-h-screen bg-slate-950 text-slate-100 pb-20">
+              {authError && <div className="bg-red-600 text-white text-center py-1 font-bold text-xs">{authError}</div>}
+              {trackId ? null : <Navigation />}
+              <main className={`max-w-7xl mx-auto ${trackId ? '' : 'p-4 md:p-6'}`}>
+                {trackId ? null : (
+                    <>
+                        {activeTab === 'dashboard' && <DashboardTab />}
+                        {activeTab === 'expenses' && <ExpensesTab />}
+                        {activeTab === 'reports' && <ReportsTab />}
+                        {activeTab === 'settings' && <SettingsTab />}
+                    </>
+                )}
               </main>
             </div>
           );
