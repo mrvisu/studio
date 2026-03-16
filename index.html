@@ -56,6 +56,16 @@
             -webkit-box-shadow: 0 0 0 30px #020617 inset !important;
             -webkit-text-fill-color: white !important;
         }
+
+        /* Hide number input arrows */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
     </style>
 </head>
 <body>
@@ -78,13 +88,15 @@
 
         // --- Default Data & Settings ---
         const DEFAULT_SERVICES = [
-          { name: "تصوير زفاف (فرح)", price: 2000, desc: "تغطية الفرح بالكامل + تسليم ألبوم" },
-          { name: "سيشن خطوبة", price: 1500, desc: "تصوير خارجي لمدة ساعتين" },
-          { name: "صور باسبور 4x6", price: 50, desc: "8 صور بخلفية بيضاء + التعديل" },
-          { name: "طباعة تابلوه خشب", price: 200, desc: "مقاس 30x40 سم بجودة عالية" },
-          { name: "تصوير منتجات", price: 500, desc: "تصوير 10 منتجات بخلفية بيضاء" },
-          { name: "فوتوسيشن خارجي", price: 1000, desc: "تصوير بورتريه في مكان مفتوح" },
-          { name: "تعديل صور (فوتوشوب)", price: 100, desc: "ريتاتش وتعديل ألوان وإضاءة" }
+          { name: "صورة شخصية", price: 70, desc: "مقاس 4x6 استلام بعد يوم من تاريخ التصوير" },
+          { name: "صورة شخصية فورى", price: 90, desc: "استلام فورى بعد 10 دقائق" },
+          { name: "صورة شخصية كارت", price: 70, desc: "مقاس الكارت 15x20 تسليم بعد يومين" },
+          { name: "طابلوه خشب مقاس 20x30", price: 130, desc: "" },
+          { name: "طابلوه خشب مقاس 30x40", price: 180, desc: "" },
+          { name: "طابلوه خشب مقاس 40x50", price: 280, desc: "" },
+          { name: "طابلوه خشب مقاس 50x70", price: 400, desc: "" },
+          { name: "صور فون مقاس 10x15", price: 10, desc: "طباعه من الموبايل السعر لعدد اكتر من 10 صور" },
+          { name: "صورة شخصيه", price: 45, desc: "تسليم موبايل فقط" }
         ];
 
         const DEFAULT_EXPENSE_CATEGORIES = [
@@ -334,17 +346,45 @@
             );
           };
 
+          const QuickServiceCard = ({ srvObj, onAdd }) => {
+            const [qty, setQty] = useState(1);
+            
+            return (
+              <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 transition-all shadow-sm flex flex-col gap-2 group hover:border-slate-700">
+                <div className="flex justify-between items-start">
+                  <span className="text-blue-400 text-sm font-bold group-hover:text-blue-300">{srvObj.name}</span>
+                  {srvObj.price > 0 && <span className="text-xs bg-slate-950 px-2 py-1 rounded-md text-blue-300 font-black">{srvObj.price} ج.م</span>}
+                </div>
+                {srvObj.desc && <span className="text-xs text-slate-500 leading-relaxed">{srvObj.desc}</span>}
+                <div className="flex items-center gap-2 mt-auto pt-2 border-t border-slate-800/50">
+                  <div className="flex items-center bg-slate-950 rounded-lg border border-slate-700 overflow-hidden">
+                    <button type="button" onClick={(e) => { e.preventDefault(); setQty(Math.max(1, qty - 1)); }} className="px-2.5 py-1 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors font-black">-</button>
+                    <input type="number" min="1" value={qty} onChange={e => setQty(parseInt(e.target.value) || 1)} className="w-8 bg-transparent text-white text-center outline-none text-sm font-bold" />
+                    <button type="button" onClick={(e) => { e.preventDefault(); setQty(qty + 1); }} className="px-2.5 py-1 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors font-black">+</button>
+                  </div>
+                  <button type="button" onClick={(e) => { e.preventDefault(); onAdd(srvObj, qty); setQty(1); }} className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-1.5 rounded-lg transition-colors flex justify-center items-center gap-1">
+                    <i className="ph ph-plus-circle text-sm"></i> إضافة
+                  </button>
+                </div>
+              </div>
+            );
+          };
+
           const DashboardTab = () => {
             const [showAddModal, setShowAddModal] = useState(false);
             const [formData, setFormData] = useState({ clientName: '', phone: '', photoNo: '', requirements: '', total: '', paid: '' });
             const [query, setQuery] = useState('');
             const [payModal, setPayModal] = useState(null);
 
-            const handleAddService = (srv) => {
+            const handleAddService = (srv, qty) => {
+              const validQty = parseInt(qty) || 1;
+              const addedText = validQty > 1 ? `${validQty} × ${srv.name}` : srv.name;
+              const addedPrice = (parseFloat(srv.price) || 0) * validQty;
+
               setFormData(prev => ({
                 ...prev,
-                requirements: prev.requirements ? `${prev.requirements} + ${srv.name}` : srv.name,
-                total: (parseFloat(prev.total) || 0) + (parseFloat(srv.price) || 0)
+                requirements: prev.requirements ? `${prev.requirements} + ${addedText}` : addedText,
+                total: (parseFloat(prev.total) || 0) + addedPrice
               }));
             };
 
@@ -435,20 +475,16 @@
                           <input type="text" placeholder="رقم الصورة" className="w-1/2 p-4 border border-slate-700 bg-slate-950 text-white placeholder-slate-500 rounded-xl focus:border-blue-500 outline-none" value={formData.photoNo} onChange={e => setFormData({...formData, photoNo: e.target.value})} />
                         </div>
                         <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                          <label className="text-sm font-bold text-slate-400 mb-3 block">الخدمات السريعة:</label>
+                          
+                          <div className="flex justify-between items-center mb-3">
+                              <label className="text-sm font-bold text-slate-400">الخدمات السريعة:</label>
+                          </div>
+
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                             {settings.services.map((srv, idx) => {
                               const srvObj = typeof srv === 'string' ? {name: srv, price: 0, desc: ''} : srv;
-                              return (
-                              <div key={idx} onClick={() => handleAddService(srvObj)}
-                                className="bg-slate-900 p-3 rounded-xl cursor-pointer hover:bg-slate-800 hover:border-blue-500/50 border border-slate-800 transition-all shadow-sm flex flex-col gap-1 group">
-                                <div className="flex justify-between items-start">
-                                  <span className="text-blue-400 text-sm font-bold group-hover:text-blue-300">{srvObj.name}</span>
-                                  {srvObj.price > 0 && <span className="text-xs bg-slate-950 px-2 py-1 rounded-md text-blue-300 font-black">{srvObj.price} ج.م</span>}
-                                </div>
-                                {srvObj.desc && <span className="text-xs text-slate-500 mt-1 leading-relaxed">{srvObj.desc}</span>}
-                              </div>
-                            )})}
+                              return <QuickServiceCard key={idx} srvObj={srvObj} onAdd={handleAddService} />;
+                            })}
                           </div>
                           <textarea placeholder="المطلوب بالتفصيل..." required rows="3" className="w-full p-4 border border-slate-700 bg-slate-900 text-white placeholder-slate-500 rounded-xl focus:border-blue-500 outline-none" value={formData.requirements} onChange={e => setFormData({...formData, requirements: e.target.value})} />
                         </div>
