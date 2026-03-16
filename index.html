@@ -25,8 +25,8 @@
             font-family: 'Cairo', sans-serif !important;
         }
         body {
-            font-weight: 400; /* خط رفيع أنيق كأساس للتطبيق */
-            background-color: #f8fafc; /* bg-slate-50 */
+            font-weight: 400;
+            background-color: #f8fafc;
             margin: 0;
             padding: 0;
         }
@@ -51,13 +51,19 @@
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js';
 
         const { useState, useEffect, useMemo } = React;
 
         // --- Default Data & Settings ---
         const DEFAULT_SERVICES = [
-          "تصوير زفاف (فرح)", "سيشن خطوبة", "صور باسبور 4x6", 
-          "طباعة تابلوه خشب", "تصوير منتجات", "فوتوسيشن خارجي", "تعديل صور (فوتوشوب)"
+          { name: "تصوير زفاف (فرح)", price: 2000 },
+          { name: "سيشن خطوبة", price: 1500 },
+          { name: "صور باسبور 4x6", price: 50 },
+          { name: "طباعة تابلوه خشب", price: 200 },
+          { name: "تصوير منتجات", price: 500 },
+          { name: "فوتوسيشن خارجي", price: 1000 },
+          { name: "تعديل صور (فوتوشوب)", price: 100 }
         ];
 
         const DEFAULT_EXPENSE_CATEGORIES = [
@@ -93,6 +99,7 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        const storage = getStorage(app);
 
         function App() {
           // --- State Management ---
@@ -151,7 +158,11 @@
             const fetchSettings = async () => {
               const docSnap = await getDoc(doc(db, basePath, 'settings', 'main'));
               if (docSnap.exists()) {
-                setSettings(docSnap.data());
+                let data = docSnap.data();
+                if (data.services && data.services.length > 0 && typeof data.services[0] === 'string') {
+                    data.services = data.services.map(s => ({ name: s, price: 0 }));
+                }
+                setSettings(data);
               }
             };
             fetchSettings();
@@ -295,7 +306,8 @@
             const handleAddService = (srv) => {
               setFormData(prev => ({
                 ...prev,
-                requirements: prev.requirements ? `${prev.requirements} + ${srv}` : srv
+                requirements: prev.requirements ? `${prev.requirements} + ${srv.name}` : srv.name,
+                total: (parseFloat(prev.total) || 0) + (parseFloat(srv.price) || 0)
               }));
             };
 
@@ -454,12 +466,15 @@
                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                           <label className="text-sm font-bold text-slate-700 mb-3 block">قوالب الخدمات السريعة (اضغط للإضافة):</label>
                           <div className="flex flex-wrap gap-2 mb-3">
-                            {settings.services.map((srv, idx) => (
-                              <span key={idx} onClick={() => handleAddService(srv)}
-                                className="bg-white text-blue-700 text-sm px-3 py-1.5 rounded-full cursor-pointer hover:bg-blue-600 hover:text-white border border-blue-200 transition-colors shadow-sm">
-                                {srv}
+                            {settings.services.map((srv, idx) => {
+                              const srvObj = typeof srv === 'string' ? {name: srv, price: 0} : srv;
+                              return (
+                              <span key={idx} onClick={() => handleAddService(srvObj)}
+                                className="bg-white text-blue-700 text-sm px-3 py-1.5 rounded-full cursor-pointer hover:bg-blue-600 hover:text-white border border-blue-200 transition-colors shadow-sm flex items-center gap-1">
+                                {srvObj.name}
+                                {srvObj.price > 0 && <span className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-md opacity-90">{srvObj.price} ج.م</span>}
                               </span>
-                            ))}
+                            )})}
                           </div>
                           <textarea placeholder="ملاحظات أو المطلوب بالتفصيل..." required rows="3" className="w-full p-4 border-2 border-slate-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
                             value={formData.requirements} onChange={e => setFormData({...formData, requirements: e.target.value})} />
@@ -523,6 +538,7 @@
 
           const TransactionCard = ({ txn, onDelete, onPayRemaining }) => {
             const [showWaMenu, setShowWaMenu] = useState(false);
+            const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
             return (
               <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col sm:flex-row gap-4 justify-between hover:shadow-md transition-shadow relative">
@@ -544,6 +560,73 @@
                   
                   <div className="bg-slate-50 p-2 rounded text-sm text-slate-700 border border-slate-100">
                     <strong>المطلوب:</strong> {txn.requirements}
+                  </div>
+
+                  <div className="mt-3 pt-3 border-t border-slate-100">
+                    <h4 className="text-xs font-bold text-slate-500 mb-2">تسليم العمل للعميل:</h4>
+                    {txn.photoUrl ? (
+                        <div className="flex flex-wrap items-center gap-3 bg-blue-50/50 p-2 rounded-lg border border-blue-100">
+                            <img src={txn.photoUrl} alt="صورة العميل" className="w-12 h-12 object-cover rounded-md border border-slate-200" />
+                            <div className="flex-1 min-w-[150px]">
+                                <button onClick={() => {
+                                    const msg = `أهلاً أ. ${txn.clientName} 🎉\nالصور الخاصة بك جاهزة! يمكنك تحميلها بجودة عالية من الرابط التالي:\n${txn.photoUrl}\n\nنتمنى أن تنال إعجابكم، وشرفتنا في ${settings.studioName || 'الاستوديو'} 📸`;
+                                    openWhatsApp(txn.phone, msg);
+                                }} className="w-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1 shadow-sm">
+                                    <i className="ph ph-whatsapp-logo text-base"></i> إرسال رابط الصورة للعميل
+                                </button>
+                            </div>
+                            <button onClick={async () => {
+                                 if(window.confirm('هل أنت متأكد من حذف هذه الصورة من السحابة؟')) {
+                                     try {
+                                         if (txn.photoStoragePath) {
+                                             const fileRef = ref(storage, txn.photoStoragePath);
+                                             await deleteObject(fileRef);
+                                         }
+                                         const updatedTxn = { ...txn };
+                                         delete updatedTxn.photoUrl;
+                                         delete updatedTxn.photoStoragePath;
+                                         const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
+                                         await setDoc(doc(db, `artifacts/${appId}/users/${user.uid}/transactions`, txn.id), updatedTxn);
+                                     } catch (e) { console.error(e); }
+                                 }
+                            }} className="text-red-500 hover:bg-red-100 p-2 rounded-lg transition-colors" title="حذف الصورة">
+                                <i className="ph ph-trash text-lg"></i>
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2">
+                            <input 
+                                type="file" 
+                                accept="image/*" 
+                                id={`upload-${txn.id}`}
+                                className="hidden"
+                                onChange={async (e) => {
+                                    const file = e.target.files[0];
+                                    if(!file || !user) return;
+                                    setIsUploadingPhoto(true);
+                                    try {
+                                        const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
+                                        const path = `artifacts/${appId}/users/${user.uid}/photos/${txn.id}_${file.name}`;
+                                        const storageRef = ref(storage, path);
+                                        await uploadBytes(storageRef, file);
+                                        const url = await getDownloadURL(storageRef);
+                                        
+                                        const updatedTxn = { ...txn, photoUrl: url, photoStoragePath: path };
+                                        await setDoc(doc(db, `artifacts/${appId}/users/${user.uid}/transactions`, txn.id), updatedTxn);
+                                    } catch(err) {
+                                        console.error(err);
+                                        alert('عذراً، حدث خطأ أثناء رفع الصورة. يرجى التأكد من اتصالك بالإنترنت.');
+                                    } finally {
+                                        setIsUploadingPhoto(false);
+                                    }
+                                }} 
+                            />
+                            <label htmlFor={`upload-${txn.id}`} className={`cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center justify-center w-full sm:w-auto gap-2 transition-colors border border-slate-200 ${isUploadingPhoto ? 'opacity-50 pointer-events-none' : ''}`}>
+                                {isUploadingPhoto ? <i className="ph ph-spinner animate-spin text-lg"></i> : <i className="ph ph-upload-simple text-lg text-blue-600"></i>}
+                                {isUploadingPhoto ? 'جاري الرفع للسحابة...' : 'رفع صورة (بعد الانتهاء من العمل)'}
+                            </label>
+                        </div>
+                    )}
                   </div>
 
                   <div className="flex gap-4 pt-2 border-t mt-2">
@@ -881,8 +964,8 @@
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <SettingsList 
-                    title="قوالب الخدمات (المطلوب)" 
+                  <ServicesSettingsList 
+                    title="قوالب الخدمات (المطلوب والسعر)" 
                     items={settings.services || DEFAULT_SERVICES} 
                     onAdd={(v) => handleAddList('services', v)} 
                     onRemove={(i) => handleRemoveList('services', i)} 
@@ -916,6 +999,31 @@
                     <WaTemplateInput label="رسالة تذكير بالمبلغ المتبقي" val={settings.waTemplates?.reminder} onChange={(v) => updateTemplate('reminder', v)} />
                     <WaTemplateInput label="رسالة استلام عربون" val={settings.waTemplates?.deposit} onChange={(v) => updateTemplate('deposit', v)} />
                   </div>
+                </div>
+              </div>
+            );
+          };
+
+          const ServicesSettingsList = ({title, items, onAdd, onRemove}) => {
+            const [newName, setNewName] = useState('');
+            const [newPrice, setNewPrice] = useState('');
+            return (
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 className="font-bold text-slate-800 mb-4">{title}</h3>
+                <div className="flex gap-2 mb-4">
+                  <input type="text" value={newName} onChange={e=>setNewName(e.target.value)} className="flex-1 p-2 border-2 border-slate-200 rounded-lg focus:border-blue-500 outline-none" placeholder="اسم الخدمة..."/>
+                  <input type="number" value={newPrice} onChange={e=>setNewPrice(e.target.value)} className="w-24 p-2 border-2 border-slate-200 rounded-lg focus:border-blue-500 outline-none" placeholder="السعر..."/>
+                  <button onClick={()=>{if(newName) { onAdd({name: newName, price: parseFloat(newPrice)||0}); setNewName(''); setNewPrice(''); }}} className="bg-blue-600 hover:bg-blue-700 text-white px-4 rounded-lg transition-colors"><i className="ph ph-plus text-xl"></i></button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {items.map((item, idx) => {
+                    const srv = typeof item === 'string' ? {name: item, price: 0} : item;
+                    return (
+                    <span key={idx} className="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full text-sm font-bold flex items-center gap-2 border border-slate-200">
+                      {srv.name} {srv.price > 0 && <span className="text-xs text-blue-600">({srv.price} ج.م)</span>}
+                      <button onClick={()=>onRemove(idx)} className="text-red-400 hover:text-red-600 bg-white rounded-full px-1.5"><i className="ph ph-x text-sm"></i></button>
+                    </span>
+                  )})}
                 </div>
               </div>
             );
