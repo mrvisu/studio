@@ -119,12 +119,17 @@
           { name: "صورة شخصية", price: 70, desc: "مقاس 4x6 استلام بعد يوم من تاريخ التصوير" },
           { name: "صورة شخصية فورى", price: 90, desc: "استلام فورى بعد 10 دقائق" },
           { name: "صورة شخصية كارت", price: 70, desc: "مقاس الكارت 15x20 تسليم بعد يومين" },
+          { name: "صور فون مقاس 10x15", price: 10, desc: "طباعه من الموبايل السعر لعدد اكتر من 10 صور" },
+          { name: "صورة شخصيه", price: 45, desc: "تسليم موبايل فقط" }
+        ];
+
+        const DEFAULT_PRODUCTS = [
           { name: "طابلوه خشب مقاس 20x30", price: 130, desc: "" },
           { name: "طابلوه خشب مقاس 30x40", price: 180, desc: "" },
           { name: "طابلوه خشب مقاس 40x50", price: 280, desc: "" },
           { name: "طابلوه خشب مقاس 50x70", price: 400, desc: "" },
-          { name: "صور فون مقاس 10x15", price: 10, desc: "طباعه من الموبايل السعر لعدد اكتر من 10 صور" },
-          { name: "صورة شخصيه", price: 45, desc: "تسليم موبايل فقط" }
+          { name: "برواز مقاس A4", price: 100, desc: "برواز جاهز" },
+          { name: "ألبوم صور 100 صورة", price: 150, desc: "ألبوم جيوب" }
         ];
 
         const DEFAULT_EXPENSE_CATEGORIES = [
@@ -166,9 +171,11 @@
           
           const [transactions, setTransactions] = useState([]);
           const [expenses, setExpenses] = useState([]);
+          const [inventory, setInventory] = useState({});
           const [settings, setSettings] = useState({
             nextReceiptNo: 1000,
             services: DEFAULT_SERVICES,
+            products: DEFAULT_PRODUCTS,
             expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
             waTemplates: DEFAULT_WA_TEMPLATES,
             studioName: "ستوديو المراكبى",
@@ -207,17 +214,24 @@
               const docSnap = await getDoc(doc(db, basePath, 'settings', 'main'));
               if (docSnap.exists()) {
                 let data = docSnap.data();
-                if (data.services && data.services.length > 0) {
+                if (data.services) {
                     data.services = data.services.map(s => {
                         if (typeof s === 'string') return { name: s, price: 0, desc: '' };
                         return { name: s.name, price: s.price || 0, desc: s.desc || '' };
                     });
                 }
+                if (!data.products) {
+                    data.products = DEFAULT_PRODUCTS;
+                } else {
+                    data.products = data.products.map(p => {
+                        if (typeof p === 'string') return { name: p, price: 0, desc: '' };
+                        return { name: p.name, price: p.price || 0, desc: p.desc || '' };
+                    });
+                }
+                
                 if(!data.waTemplates.tracking) {
                     data.waTemplates.tracking = DEFAULT_WA_TEMPLATES.tracking;
                 }
-                
-                // تحديث قالب الفاتورة القديم ليتضمن رابط التتبع والرسالة الترحيبية ووقت التسجيل إذا لم يكن موجوداً
                 if (data.waTemplates.invoice && !data.waTemplates.invoice.includes('{track_url}')) {
                     data.waTemplates.invoice = DEFAULT_WA_TEMPLATES.invoice;
                 } else if (data.waTemplates.invoice && !data.waTemplates.invoice.includes('{time}')) {
@@ -229,6 +243,12 @@
             };
             fetchSettings();
 
+            const unsubInv = onSnapshot(doc(db, basePath, 'inventory', 'main'), (docSnap) => {
+              if (docSnap.exists()) {
+                setInventory(docSnap.data());
+              }
+            }, (err) => console.error(err));
+
             const unsubTxns = onSnapshot(collection(db, basePath, 'transactions'), (snapshot) => {
               const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
               data.sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
@@ -236,20 +256,20 @@
               setDataLoaded(true);
             });
 
-            if(!isTracking) { // Only listen to expenses if not in tracking mode
+            if(!isTracking) {
                 const unsubExps = onSnapshot(collection(db, basePath, 'expenses'), (snapshot) => {
                   const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
                   data.sort((a, b) => new Date(b.date) - new Date(a.date));
                   setExpenses(data);
                 });
-                return () => { unsubTxns(); unsubExps(); };
+                return () => { unsubTxns(); unsubExps(); unsubInv(); };
             }
 
-            return () => { unsubTxns(); };
+            return () => { unsubTxns(); unsubInv(); };
           }, [user, isTracking]);
 
           useEffect(() => {
-            if (!user || isTracking) return; // Prevent client from saving settings
+            if (!user || isTracking) return; 
             const timer = setTimeout(() => {
               const appId = 'studio-marakby';
               setDoc(doc(db, `artifacts/${appId}/public/data/settings`, 'main'), settings);
@@ -257,7 +277,6 @@
             return () => clearTimeout(timer);
           }, [settings, user, isTracking]);
 
-          // فترة سماح لمنع ظهور رسالة الطلب غير موجود قبل اكتمال جلب البيانات
           useEffect(() => {
               if (isTracking && dataLoaded) {
                   const exists = transactions.some(t => t.phone === trackPhone && t.receiptNo.toString() === trackReceipt);
@@ -269,6 +288,15 @@
                   }
               }
           }, [isTracking, dataLoaded, transactions, trackPhone, trackReceipt]);
+
+          const updateInventory = async (itemName, change) => {
+            const newInv = { ...inventory, [itemName]: Math.max(0, (inventory[itemName] || 0) + change) };
+            setInventory(newInv);
+            if (user) {
+               const appId = 'studio-marakby';
+               await setDoc(doc(db, `artifacts/${appId}/public/data/inventory`, 'main'), newInv);
+            }
+          };
 
           const formatCurrency = (num) => Number(num || 0).toLocaleString('ar-EG') + ' ج.م';
           const formatDate = (dateStr) => new Date(dateStr).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' });
@@ -374,10 +402,10 @@
                               <div className="bg-slate-950/80 py-3 px-4 rounded-2xl border border-indigo-500/20 flex flex-col items-center gap-1 shadow-inner mb-4">
                                   <span className="text-xs text-indigo-300">رقم التحويل (فودافون كاش / إنستاباي):</span>
                                   <div className="flex items-center gap-3 mt-1">
-                                      <span className="text-2xl font-black font-mono text-white tracking-widest">01126810107</span>
+                                      <span className="text-2xl font-black font-mono text-white tracking-widest">01201260040</span>
                                       <button onClick={(e) => {
                                           const el = document.createElement('textarea');
-                                          el.value = '01126810107';
+                                          el.value = '01201260040';
                                           document.body.appendChild(el);
                                           el.select();
                                           document.execCommand('copy');
@@ -480,7 +508,7 @@
           const Navigation = () => {
             const navItems = [
               { id: 'dashboard', icon: <i className="ph ph-squares-four text-xl"></i>, label: 'الرئيسية (إضافة وبحث)' },
-              { id: 'expenses', icon: <i className="ph ph-printer text-xl"></i>, label: 'المصروفات' },
+              { id: 'expenses', icon: <i className="ph ph-printer text-xl"></i>, label: 'المصروفات والمخزون' },
               { id: 'reports', icon: <i className="ph ph-calendar-blank text-xl"></i>, label: 'التقارير' },
               { id: 'marketing', icon: <i className="ph ph-megaphone text-xl"></i>, label: 'التسويق 📣' },
               { id: 'settings', icon: <i className="ph ph-gear text-xl"></i>, label: 'الإعدادات' },
@@ -521,14 +549,33 @@
             );
           };
 
-          const QuickServiceCard = ({ srvObj, onAdd }) => {
+          const QuickServiceCard = ({ srvObj, onAdd, colorTheme = 'blue' }) => {
             const [qty, setQty] = useState(1);
+            const [customPrice, setCustomPrice] = useState(srvObj.price || 0);
+
+            useEffect(() => {
+                setCustomPrice(srvObj.price || 0);
+            }, [srvObj.price]);
             
+            const themeColors = {
+                blue: { text: 'text-blue-400', hoverText: 'group-hover:text-blue-300', btn: 'bg-blue-600 hover:bg-blue-500' },
+                purple: { text: 'text-purple-400', hoverText: 'group-hover:text-purple-300', btn: 'bg-purple-600 hover:bg-purple-500' }
+            };
+            const currentTheme = themeColors[colorTheme] || themeColors.blue;
+
             return (
               <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 transition-all shadow-sm flex flex-col gap-2 group hover:border-slate-700">
-                <div className="flex justify-between items-start">
-                  <span className="text-blue-400 text-sm font-bold group-hover:text-blue-300">{srvObj.name}</span>
-                  {srvObj.price > 0 && <span className="text-xs bg-slate-950 px-2 py-1 rounded-md text-blue-300 font-black">{srvObj.price} ج.م</span>}
+                <div className="flex justify-between items-start gap-2">
+                  <span className={`${currentTheme.text} text-sm font-bold ${currentTheme.hoverText} flex-1 leading-snug`}>{srvObj.name}</span>
+                  <div className="flex items-center bg-slate-950 rounded-md border border-slate-700 px-2 py-1 focus-within:border-slate-500 transition-colors w-24 shrink-0">
+                     <input 
+                         type="number" 
+                         value={customPrice} 
+                         onChange={e => setCustomPrice(parseFloat(e.target.value) || 0)} 
+                         className="w-full bg-transparent text-white text-center outline-none text-xs font-bold" 
+                     />
+                     <span className="text-[10px] text-slate-500 mr-1">ج.م</span>
+                  </div>
                 </div>
                 {srvObj.desc && <span className="text-xs text-slate-500 leading-relaxed">{srvObj.desc}</span>}
                 <div className="flex items-center gap-2 mt-auto pt-2 border-t border-slate-800/50">
@@ -537,7 +584,7 @@
                     <input type="number" min="1" value={qty} onChange={e => setQty(parseInt(e.target.value) || 1)} className="w-8 bg-transparent text-white text-center outline-none text-sm font-bold" />
                     <button type="button" onClick={(e) => { e.preventDefault(); setQty(qty + 1); }} className="px-2.5 py-1 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors font-black">+</button>
                   </div>
-                  <button type="button" onClick={(e) => { e.preventDefault(); onAdd(srvObj, qty); setQty(1); }} className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-1.5 rounded-lg transition-colors flex justify-center items-center gap-1">
+                  <button type="button" onClick={(e) => { e.preventDefault(); onAdd({...srvObj, price: customPrice}, qty); setQty(1); setCustomPrice(srvObj.price||0); }} className={`flex-1 text-white text-xs font-bold py-1.5 rounded-lg transition-colors flex justify-center items-center gap-1 ${currentTheme.btn}`}>
                     <i className="ph ph-plus-circle text-sm"></i> إضافة
                   </button>
                 </div>
@@ -547,7 +594,7 @@
 
           const DashboardTab = () => {
             const [showAddModal, setShowAddModal] = useState(false);
-            const [formData, setFormData] = useState({ clientName: '', phone: '', photoNo: '', requirements: '', total: '', paid: '', paymentMethod: 'cash' });
+            const [formData, setFormData] = useState({ clientName: '', phone: '', photoNo: '', requirements: '', total: '', paid: '', paymentMethod: 'cash', soldProducts: [] });
             const [query, setQuery] = useState('');
             const [payModal, setPayModal] = useState(null);
             const [receiptImageModal, setReceiptImageModal] = useState(null);
@@ -558,11 +605,16 @@
               const addedText = validQty > 1 ? `${validQty} × ${srv.name}` : srv.name;
               const addedPrice = (parseFloat(srv.price) || 0) * validQty;
 
-              setFormData(prev => ({
-                ...prev,
-                requirements: prev.requirements ? `${prev.requirements} + ${addedText}` : addedText,
-                total: (parseFloat(prev.total) || 0) + addedPrice
-              }));
+              setFormData(prev => {
+                 const newProductsList = [...(prev.soldProducts || [])];
+                 newProductsList.push({ name: srv.name, qty: validQty });
+                 return {
+                    ...prev,
+                    requirements: prev.requirements ? `${prev.requirements} + ${addedText}` : addedText,
+                    total: (parseFloat(prev.total) || 0) + addedPrice,
+                    soldProducts: newProductsList
+                 };
+              });
             };
 
             const handleSubmit = async (e) => {
@@ -585,9 +637,29 @@
                 month: new Date().getMonth() + 1,
                 year: new Date().getFullYear()
               };
-              await setDoc(doc(db, `artifacts/studio-marakby/public/data/transactions`, newTxn.id), newTxn);
+              
+              const appId = 'studio-marakby';
+              await setDoc(doc(db, `artifacts/${appId}/public/data/transactions`, newTxn.id), newTxn);
+
+              // Auto-Deduct Inventory
+              if (formData.soldProducts && formData.soldProducts.length > 0) {
+                 const newInv = { ...inventory };
+                 let invChanged = false;
+                 formData.soldProducts.forEach(item => {
+                    const isProduct = settings.products.some(p => (typeof p === 'string' ? p : p.name) === item.name);
+                    if (isProduct) {
+                       newInv[item.name] = Math.max(0, (newInv[item.name] || 0) - item.qty);
+                       invChanged = true;
+                    }
+                 });
+                 if (invChanged) {
+                    setInventory(newInv);
+                    await setDoc(doc(db, `artifacts/${appId}/public/data/inventory`, 'main'), newInv);
+                 }
+              }
+
               setSettings({...settings, nextReceiptNo: (settings.nextReceiptNo || 1000) + 1});
-              setFormData({ clientName: '', phone: '', photoNo: '', requirements: '', total: '', paid: '', paymentMethod: 'cash' });
+              setFormData({ clientName: '', phone: '', photoNo: '', requirements: '', total: '', paid: '', paymentMethod: 'cash', soldProducts: [] });
               setShowAddModal(false);
             };
 
@@ -653,16 +725,28 @@
                           <input type="text" placeholder="رقم الصورة" className="w-1/2 p-4 border border-slate-700 bg-slate-950 text-white placeholder-slate-500 rounded-xl focus:border-blue-500 outline-none" value={formData.photoNo} onChange={e => setFormData({...formData, photoNo: e.target.value})} />
                         </div>
                         <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                          
                           <div className="flex justify-between items-center mb-3">
-                              <label className="text-sm font-bold text-slate-400">الخدمات السريعة:</label>
+                              <label className="text-sm font-bold text-slate-400"><i className="ph ph-camera text-blue-400 text-lg align-middle"></i> الخدمات السريعة:</label>
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
                             {settings.services.map((srv, idx) => {
                               const srvObj = typeof srv === 'string' ? {name: srv, price: 0, desc: ''} : srv;
-                              return <QuickServiceCard key={idx} srvObj={srvObj} onAdd={handleAddService} />;
+                              return <QuickServiceCard key={`srv-${idx}`} srvObj={srvObj} onAdd={handleAddService} colorTheme="blue" />;
                             })}
                           </div>
-                          <textarea placeholder="المطلوب بالتفصيل..." required rows="3" className="w-full p-4 border border-slate-700 bg-slate-900 text-white placeholder-slate-500 rounded-xl focus:border-blue-500 outline-none" value={formData.requirements} onChange={e => setFormData({...formData, requirements: e.target.value})} />
+
+                          <div className="flex justify-between items-center mb-3 border-t border-slate-800 pt-4">
+                              <label className="text-sm font-bold text-slate-400"><i className="ph ph-package text-purple-400 text-lg align-middle"></i> البضاعة والمنتجات (تخصم تلقائياً من المخزون):</label>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                            {settings.products && settings.products.map((prod, idx) => {
+                              const prodObj = typeof prod === 'string' ? {name: prod, price: 0, desc: ''} : prod;
+                              return <QuickServiceCard key={`prod-${idx}`} srvObj={prodObj} onAdd={handleAddService} colorTheme="purple" />;
+                            })}
+                          </div>
+
+                          <textarea placeholder="المطلوب بالتفصيل..." required rows="3" className="w-full p-4 mt-2 border border-slate-700 bg-slate-900 text-white placeholder-slate-500 rounded-xl focus:border-blue-500 outline-none" value={formData.requirements} onChange={e => setFormData({...formData, requirements: e.target.value})} />
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                           <input type="number" placeholder="الإجمالي" required className="p-4 border border-slate-700 bg-slate-950 text-white rounded-xl outline-none focus:border-blue-500" value={formData.total} onChange={e => setFormData({...formData, total: e.target.value})} />
@@ -701,7 +785,6 @@
                             electronicPaid: (payModal.electronicPaid || 0) + (payModal.paymentType === 'electronic' ? amount : 0),
                             remaining: payModal.total - (payModal.paid + amount) 
                         };
-                        // إزالة الصورة المعلقة إذا تم تأكيد السداد
                         if (updated.pendingReceipt) delete updated.pendingReceipt;
                         delete updated.paymentType;
                         await setDoc(doc(db, `artifacts/studio-marakby/public/data/transactions`, updated.id), updated);
@@ -747,7 +830,7 @@
                         </div>
 
                         <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                           <p className="text-slate-500 text-xs mb-2">المطلوب (الخدمات)</p>
+                           <p className="text-slate-500 text-xs mb-2">المطلوب (الخدمات والمنتجات)</p>
                            <p className="text-slate-200 leading-relaxed font-medium whitespace-pre-wrap">{txnDetailsModal.requirements}</p>
                         </div>
 
@@ -906,36 +989,87 @@
 
           const ExpensesTab = () => {
             const [expData, setExpData] = useState({ amount: '', category: settings.expenseCategories[0], notes: '' });
+            
             const handleAddExpense = async (e) => {
               e.preventDefault();
               const newExp = { id: Date.now().toString(), date: new Date().toISOString(), amount: parseFloat(expData.amount), category: expData.category, notes: expData.notes, month: new Date().getMonth() + 1, year: new Date().getFullYear() };
-              await setDoc(doc(db, `artifacts/studio-marakby/public/data/expenses`, newExp.id), newExp);
+              const appId = 'studio-marakby';
+              await setDoc(doc(db, `artifacts/${appId}/public/data/expenses`, newExp.id), newExp);
               setExpData({ amount: '', category: settings.expenseCategories[0], notes: '' });
             };
+
             const todaysExpenses = expenses.filter(e => new Date(e.date).toDateString() === new Date().toDateString());
+            
+            const inventoryItemsList = useMemo(() => {
+               const prods = (settings.products || []).map(p => typeof p === 'string' ? p : p.name);
+               return ["ورق طباعة صور", "أحبار طابعة", ...prods];
+            }, [settings.products]);
+
             return (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800 h-fit">
-                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-100 border-b border-slate-800 pb-4"><i className="ph ph-money text-red-400"></i> تسجيل مصروفات</h2>
-                  <form onSubmit={handleAddExpense} className="space-y-4">
-                    <input type="number" required placeholder="المبلغ" value={expData.amount} onChange={e => setExpData({...expData, amount: e.target.value})} className="w-full p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none focus:border-red-500 font-bold" />
-                    <select value={expData.category} onChange={e => setExpData({...expData, category: e.target.value})} className="w-full p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none focus:border-red-500">
-                      {settings.expenseCategories.map((cat, idx) => <option key={idx} value={cat}>{cat}</option>)}
-                    </select>
-                    <input type="text" placeholder="ملاحظات" value={expData.notes} onChange={e => setExpData({...expData, notes: e.target.value})} className="w-full p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none focus:border-red-500 placeholder-slate-500" />
-                    <button type="submit" className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg shadow-md transition-all">إضافة المصروف</button>
-                  </form>
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="xl:col-span-2 space-y-6">
+                   <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
+                     <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-100 border-b border-slate-800 pb-4"><i className="ph ph-money text-red-400 text-2xl"></i> تسجيل مصروفات</h2>
+                     <form onSubmit={handleAddExpense} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                       <div>
+                         <label className="block text-sm font-bold text-slate-400 mb-2">المبلغ (ج.م)</label>
+                         <input type="number" required placeholder="المبلغ" value={expData.amount} onChange={e => setExpData({...expData, amount: e.target.value})} className="w-full p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none focus:border-red-500 font-bold" />
+                       </div>
+                       <div>
+                         <label className="block text-sm font-bold text-slate-400 mb-2">بند المصروف</label>
+                         <select value={expData.category} onChange={e => setExpData({...expData, category: e.target.value})} className="w-full p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none focus:border-red-500">
+                           {settings.expenseCategories.map((cat, idx) => <option key={idx} value={cat}>{cat}</option>)}
+                         </select>
+                       </div>
+                       <div>
+                         <label className="block text-sm font-bold text-slate-400 mb-2">ملاحظات</label>
+                         <input type="text" placeholder="اختياري..." value={expData.notes} onChange={e => setExpData({...expData, notes: e.target.value})} className="w-full p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none focus:border-red-500 placeholder-slate-500" />
+                       </div>
+                       <button type="submit" className="sm:col-span-3 w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg shadow-md transition-all flex items-center justify-center gap-2"><i className="ph ph-plus-circle text-xl"></i> إضافة المصروف</button>
+                     </form>
+                   </div>
+                   <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
+                      <h2 className="text-xl font-bold mb-4 flex justify-between text-slate-100 border-b border-slate-800 pb-4">
+                       <span>مصروفات اليوم</span>
+                       <span className="text-red-400 text-sm bg-red-950/40 px-3 py-1 rounded border border-red-900/50">الإجمالي: {formatCurrency(todaysExpenses.reduce((s,e)=>s+e.amount,0))}</span>
+                     </h2>
+                     <div className="space-y-3">
+                       {todaysExpenses.length === 0 ? <p className="text-slate-500 text-center p-6 bg-slate-950 rounded-xl border border-slate-800 border-dashed">لم يتم تسجيل مصروفات اليوم.</p> : todaysExpenses.map(exp => (
+                         <div key={exp.id} className="flex justify-between items-center p-4 bg-slate-950 rounded-xl border border-slate-800">
+                           <div>
+                               <p className="font-bold text-slate-200">{exp.category} <span className="text-red-400 mr-2">{exp.amount} ج.م</span></p>
+                               {exp.notes && <p className="text-xs text-slate-500 mt-1">{exp.notes}</p>}
+                               <p className="text-xs text-slate-600 mt-2 font-mono">{formatDate(exp.date)}</p>
+                           </div>
+                           <button onClick={async () => await deleteDoc(doc(db, `artifacts/studio-marakby/public/data/expenses`, exp.id))} className="text-slate-500 hover:text-red-400 p-2"><i className="ph ph-trash text-xl"></i></button>
+                         </div>
+                       ))}
+                     </div>
+                   </div>
                 </div>
-                <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
-                  <h2 className="text-xl font-bold mb-4 flex justify-between text-slate-100 border-b border-slate-800 pb-4"><span>مصروفات اليوم</span><span className="text-red-400 text-sm">{formatCurrency(todaysExpenses.reduce((s,e)=>s+e.amount,0))}</span></h2>
-                  <div className="space-y-3">
-                    {todaysExpenses.map(exp => (
-                      <div key={exp.id} className="flex justify-between items-center p-3 bg-slate-950 rounded-lg border border-slate-800">
-                        <div><p className="font-bold text-slate-200">{exp.category} <span className="text-red-400 mr-2">{exp.amount} ج.م</span></p><p className="text-xs text-slate-500 mt-1">{exp.notes}</p></div>
-                        <button onClick={async () => await deleteDoc(doc(db, `artifacts/studio-marakby/public/data/expenses`, exp.id))} className="text-slate-500 hover:text-red-400 p-2"><i className="ph ph-trash text-lg"></i></button>
+
+                <div className="xl:col-span-1">
+                   <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800 sticky top-24">
+                      <h2 className="text-xl font-bold mb-2 flex items-center gap-2 text-slate-100 border-b border-slate-800 pb-4">
+                          <i className="ph ph-stack text-purple-400 text-2xl"></i> إدارة المخزون
+                      </h2>
+                      <p className="text-xs text-slate-500 mb-5 leading-relaxed bg-slate-950 p-3 rounded-lg border border-slate-800">
+                        يتم خصم البضاعة من المخزون <span className="font-bold text-purple-400">تلقائياً</span> بمجرد بيعها من واجهة الإضافة.
+                      </p>
+                      
+                      <div className="space-y-3 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
+                         {inventoryItemsList.map(item => (
+                            <div key={item} className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center p-3 bg-slate-950 rounded-xl border border-slate-800 gap-3 hover:border-slate-700 transition-colors">
+                               <span className="font-bold text-slate-300 text-sm leading-snug">{item}</span>
+                               <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-700 shadow-sm w-full sm:w-auto justify-center shrink-0">
+                                  <button type="button" onClick={()=>updateInventory(item, -1)} className="text-red-400 hover:bg-slate-800 p-2 rounded-md transition-colors"><i className="ph ph-minus text-sm"></i></button>
+                                  <span className="font-black text-base w-8 text-center text-slate-100">{inventory[item] || 0}</span>
+                                  <button type="button" onClick={()=>updateInventory(item, 1)} className="text-green-400 hover:bg-slate-800 p-2 rounded-md transition-colors"><i className="ph ph-plus text-sm"></i></button>
+                               </div>
+                            </div>
+                         ))}
                       </div>
-                    ))}
-                  </div>
+                   </div>
                 </div>
               </div>
             );
@@ -951,12 +1085,13 @@
             const filteredExp = expenses.filter(e => e.month == filter.month && e.year == filter.year);
             
             const stats = useMemo(() => {
+              const totalExpected = filteredTxns.reduce((sum, t) => sum + t.total, 0);
               const totalCollected = filteredTxns.reduce((sum, t) => sum + t.paid, 0);
               const totalElectronic = filteredTxns.reduce((sum, t) => sum + (t.electronicPaid || 0), 0);
               const totalCash = totalCollected - totalElectronic;
               const totalExpenses = filteredExp.reduce((sum, e) => sum + e.amount, 0);
               const totalDebts = filteredTxns.reduce((sum, t) => sum + t.remaining, 0);
-              return { totalCollected, totalCash, totalElectronic, totalExpenses, totalDebts, net: totalCollected - totalExpenses };
+              return { totalExpected, totalCollected, totalCash, totalElectronic, totalExpenses, totalDebts, net: totalCollected - totalExpenses };
             }, [filteredTxns, filteredExp]);
 
             return (
@@ -1015,7 +1150,6 @@
                             electronicPaid: (payModal.electronicPaid || 0) + (payModal.paymentType === 'electronic' ? amount : 0),
                             remaining: payModal.total - (payModal.paid + amount) 
                         };
-                        // إزالة الصورة المعلقة إذا تم تأكيد السداد
                         if (updated.pendingReceipt) delete updated.pendingReceipt;
                         delete updated.paymentType;
                         await setDoc(doc(db, `artifacts/studio-marakby/public/data/transactions`, updated.id), updated);
@@ -1054,7 +1188,6 @@
             const [copyText, setCopyText] = useState('نسخ جميع الأرقام لعمل قائمة بث');
             const [customNumbersInput, setCustomNumbersInput] = useState('');
 
-            // Extract unique clients by phone number from DB
             const uniqueClients = useMemo(() => {
               const clientsMap = new Map();
               transactions.forEach(t => {
@@ -1067,7 +1200,6 @@
               return Array.from(clientsMap.values());
             }, [transactions]);
 
-            // Process custom pasted numbers
             const customClients = useMemo(() => {
               if (!customNumbersInput.trim()) return [];
               const numbers = customNumbersInput.split(/[,،\n]/).map(n => n.trim()).filter(n => n.length >= 8);
@@ -1101,14 +1233,11 @@
 
             return (
               <div className="space-y-6">
-                {/* Promo Message & Input Settings */}
                 <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
                   <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-100 border-b border-slate-800 pb-4">
                     <i className="ph ph-megaphone text-yellow-500 text-2xl"></i> التسويق والرسائل الجماعية
                   </h2>
                   <div className="space-y-6 mt-6">
-                     
-                     {/* Textarea for promo message */}
                      <div>
                         <label className="block text-sm font-bold mb-3 text-slate-400">
                             محتوى رسالة التهنئة / العرض <br/>
@@ -1117,7 +1246,6 @@
                         <textarea rows="4" value={promoMessage} onChange={e => setPromoMessage(e.target.value)} className="w-full p-4 border border-slate-700 bg-slate-950 text-slate-200 rounded-xl focus:border-yellow-500 outline-none text-sm font-mono custom-scrollbar transition-colors" />
                      </div>
 
-                     {/* Textarea for custom numbers */}
                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
                         <label className="block text-sm font-bold mb-3 text-blue-400">
                             <i className="ph ph-list-plus text-lg ml-1 align-middle"></i> إضافة أرقام خارجية (مفصولة بفاصلة) <br/>
@@ -1143,7 +1271,6 @@
                   </div>
                 </div>
 
-                {/* Clients List */}
                 <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6 border-b border-slate-800 pb-4">
                       <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
@@ -1180,6 +1307,7 @@
           const SettingsTab = () => {
             const handleAddList = (key, val) => { if(!val) return; setSettings({...settings, [key]: [...settings[key], val]}); };
             const handleRemoveList = (key, idx) => { const newList = [...settings[key]]; newList.splice(idx, 1); setSettings({...settings, [key]: newList}); };
+            
             return (
               <div className="space-y-8">
                 <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
@@ -1202,9 +1330,14 @@
                     </div>
                   </div>
                 </div>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <ServicesSettingsList title="قوالب الخدمات والأسعار" items={settings.services} onAdd={v => handleAddList('services', v)} onRemove={i => handleRemoveList('services', i)} />
-                   <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
+                   <ServicesSettingsList title="قوالب خدمات التصوير" items={settings.services || []} onAdd={v => handleAddList('services', v)} onRemove={i => handleRemoveList('services', i)} colorTheme="blue" />
+                   <ServicesSettingsList title="قوالب البضاعة والمنتجات" items={settings.products || []} onAdd={v => handleAddList('products', v)} onRemove={i => handleRemoveList('products', i)} colorTheme="purple" />
+                </div>
+                
+                <div>
+                    <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
                       <h3 className="font-bold mb-4 border-b border-slate-800 pb-2 text-slate-100">أقسام المصروفات</h3>
                       <div className="flex gap-2 mb-4">
                         <input type="text" id="newCat" className="flex-1 p-2 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none focus:border-blue-500 placeholder-slate-500" placeholder="بند مصروف جديد..." />
@@ -1219,53 +1352,93 @@
                       </div>
                    </div>
                 </div>
+
                 <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
-                  <h2 className="text-xl font-bold mb-4 border-b border-slate-800 pb-4 text-slate-100"><i className="ph ph-whatsapp-logo text-green-400"></i> قوالب رسائل الواتساب</h2>
-                  <div className="space-y-4">
-                    <p className="text-sm text-slate-400 bg-slate-800/50 p-4 rounded-xl border border-slate-700 leading-relaxed mb-6">
-                      استخدم المتغيرات التالية للإضافة التلقائية للبيانات: <br/>
-                      <code className="text-blue-400 font-bold mx-1 bg-slate-900 px-1 rounded">{'{name}'}</code> <code className="text-blue-400 font-bold mx-1 bg-slate-900 px-1 rounded">{'{receipt}'}</code> <code className="text-blue-400 font-bold mx-1 bg-slate-900 px-1 rounded">{'{total}'}</code> <code className="text-blue-400 font-bold mx-1 bg-slate-900 px-1 rounded">{'{remaining}'}</code> <code className="text-blue-400 font-bold mx-1 bg-slate-900 px-1 rounded">{'{date}'}</code> <code className="text-blue-400 font-bold mx-1 bg-slate-900 px-1 rounded">{'{time}'}</code> <code className="text-purple-400 font-bold mx-1 bg-slate-900 px-1 rounded">{'{studio}'}</code>
-                    </p>
-                    {Object.keys(settings.waTemplates).map(key => (
-                      <div key={key}>
-                        <label className="block text-sm font-bold mb-2 text-slate-400">
-                            {key === 'invoice' ? 'شكل الفاتورة الإلكترونية' : 
-                             key === 'tracking' ? 'رسالة تتبع الطلب (يرسل معها الرابط تلقائياً)' : key}
+                  <h2 className="text-xl font-bold mb-4 border-b border-slate-800 pb-4 text-slate-100 flex items-center gap-2">
+                      <i className="ph ph-whatsapp-logo text-green-400 text-2xl"></i> قوالب رسائل الواتساب
+                  </h2>
+                  
+                  <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800 mb-6 flex flex-col md:flex-row gap-4 items-center justify-between shadow-inner">
+                     <p className="text-sm text-slate-400 leading-relaxed flex-1">
+                        <strong className="text-slate-300 block mb-2">المتغيرات المتاحة للنسخ والإضافة التلقائية:</strong>
+                        <code className="text-blue-400 font-bold mx-1 bg-slate-900 px-2 py-1 rounded border border-slate-700 mt-2 inline-block shadow-sm">{'{name}'}</code>
+                        <code className="text-blue-400 font-bold mx-1 bg-slate-900 px-2 py-1 rounded border border-slate-700 mt-2 inline-block shadow-sm">{'{receipt}'}</code>
+                        <code className="text-blue-400 font-bold mx-1 bg-slate-900 px-2 py-1 rounded border border-slate-700 mt-2 inline-block shadow-sm">{'{total}'}</code>
+                        <code className="text-blue-400 font-bold mx-1 bg-slate-900 px-2 py-1 rounded border border-slate-700 mt-2 inline-block shadow-sm">{'{remaining}'}</code>
+                        <code className="text-blue-400 font-bold mx-1 bg-slate-900 px-2 py-1 rounded border border-slate-700 mt-2 inline-block shadow-sm">{'{date}'}</code>
+                        <code className="text-blue-400 font-bold mx-1 bg-slate-900 px-2 py-1 rounded border border-slate-700 mt-2 inline-block shadow-sm">{'{time}'}</code>
+                        <code className="text-purple-400 font-bold mx-1 bg-slate-900 px-2 py-1 rounded border border-slate-700 mt-2 inline-block shadow-sm">{'{studio}'}</code>
+                     </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {Object.keys(settings.waTemplates).map(key => {
+                      const getLabel = (k) => {
+                        switch(k) {
+                          case 'welcome': return '👋 رسالة الترحيب الأولى';
+                          case 'invoice': return '🧾 شكل الفاتورة الإلكترونية';
+                          case 'reminder': return '⚠️ تذكير بالمبلغ المتبقي';
+                          case 'ready': return '🎉 رسالة جاهزية الطلب للاستلام';
+                          case 'deposit': return '💸 تأكيد استلام العربون';
+                          case 'tracking': return '📍 رسالة تتبع الطلب بالرابط';
+                          default: return k;
+                        }
+                      };
+
+                      return (
+                      <div key={key} className="bg-slate-950 p-5 rounded-lg border border-slate-700 hover:border-green-500/50 transition-all group shadow-sm flex flex-col relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-1 h-full bg-slate-800 group-hover:bg-green-500 transition-colors"></div>
+                        <label className="block text-sm font-bold mb-3 text-slate-300 group-hover:text-green-400 transition-colors pr-2">
+                            {getLabel(key)}
                         </label>
-                        <textarea rows="4" value={settings.waTemplates[key]} onChange={e => setSettings({...settings, waTemplates: {...settings.waTemplates, [key]: e.target.value}})} className="w-full p-4 border border-slate-700 bg-slate-950 text-slate-300 rounded-xl focus:border-green-500 outline-none text-sm font-mono custom-scrollbar" />
+                        <div className="relative flex-1 flex flex-col">
+                            <textarea 
+                                rows="5" 
+                                value={settings.waTemplates[key]} 
+                                onChange={e => setSettings({...settings, waTemplates: {...settings.waTemplates, [key]: e.target.value}})} 
+                                className="w-full flex-1 p-4 border border-slate-700 bg-slate-900 text-green-50 rounded-md focus:border-green-500 focus:bg-slate-950 focus:ring-1 focus:ring-green-500/30 outline-none text-sm font-mono custom-scrollbar transition-all leading-relaxed shadow-inner resize-y" 
+                                placeholder="اكتب قالب الرسالة هنا..."
+                            />
+                        </div>
                       </div>
-                    ))}
+                    )})}
                   </div>
                 </div>
               </div>
             );
           };
 
-          const ServicesSettingsList = ({title, items, onAdd, onRemove}) => {
+          const ServicesSettingsList = ({title, items, onAdd, onRemove, colorTheme = 'blue'}) => {
             const [newName, setNewName] = useState('');
             const [newPrice, setNewPrice] = useState('');
             const [newDesc, setNewDesc] = useState('');
+            
+            const isBlue = colorTheme === 'blue';
+            const colorClass = isBlue ? 'focus:border-blue-500' : 'focus:border-purple-500';
+            const btnClass = isBlue ? 'bg-blue-600 hover:bg-blue-500' : 'bg-purple-600 hover:bg-purple-500';
+            const textClass = isBlue ? 'text-blue-400' : 'text-purple-400';
+
             return (
               <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
                 <h3 className="font-bold text-slate-100 mb-4 border-b border-slate-800 pb-2">{title}</h3>
                 <div className="flex flex-col gap-3 mb-5">
                   <div className="flex gap-2">
-                    <input type="text" value={newName} onChange={e=>setNewName(e.target.value)} className="flex-1 p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none focus:border-blue-500 placeholder-slate-500 text-sm" placeholder="اسم الخدمة..."/>
-                    <input type="number" value={newPrice} onChange={e=>setNewPrice(e.target.value)} className="w-24 p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none focus:border-blue-500 placeholder-slate-500 text-sm" placeholder="السعر..."/>
+                    <input type="text" value={newName} onChange={e=>setNewName(e.target.value)} className={`flex-1 p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none ${colorClass} placeholder-slate-500 text-sm`} placeholder="الاسم..."/>
+                    <input type="number" value={newPrice} onChange={e=>setNewPrice(e.target.value)} className={`w-24 p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none ${colorClass} placeholder-slate-500 text-sm`} placeholder="السعر..."/>
                   </div>
                   <div className="flex gap-2">
-                    <input type="text" value={newDesc} onChange={e=>setNewDesc(e.target.value)} className="flex-1 p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none focus:border-blue-500 placeholder-slate-500 text-sm" placeholder="تفاصيل صغيرة تحت الخدمة (اختياري)..."/>
-                    <button onClick={()=>{if(newName){onAdd({name:newName, price:parseFloat(newPrice)||0, desc:newDesc});setNewName('');setNewPrice('');setNewDesc('');}}} className="bg-blue-600 hover:bg-blue-500 text-white px-5 rounded-lg transition-colors flex items-center justify-center"><i className="ph ph-plus text-xl"></i></button>
+                    <input type="text" value={newDesc} onChange={e=>setNewDesc(e.target.value)} className={`flex-1 p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none ${colorClass} placeholder-slate-500 text-sm`} placeholder="تفاصيل صغيرة (اختياري)..."/>
+                    <button onClick={()=>{if(newName){onAdd({name:newName, price:parseFloat(newPrice)||0, desc:newDesc});setNewName('');setNewPrice('');setNewDesc('');}}} className={`${btnClass} text-white px-5 rounded-lg transition-colors flex items-center justify-center`}><i className="ph ph-plus text-xl"></i></button>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="flex flex-col gap-2 overflow-y-auto max-h-[300px] custom-scrollbar pr-2">
                   {items.map((item, idx) => {
                     const srv = typeof item === 'string' ? {name: item, price: 0, desc: ''} : item;
                     return (
                     <div key={idx} className="bg-slate-800 p-3 rounded-xl flex justify-between items-start border border-slate-700">
                       <div className="flex flex-col">
                         <span className="text-slate-300 text-sm font-bold flex items-center gap-2">
-                          {srv.name} {srv.price > 0 && <span className="text-xs bg-slate-950 px-1.5 py-0.5 rounded text-blue-400">{srv.price} ج.م</span>}
+                          {srv.name} {srv.price > 0 && <span className={`text-[10px] bg-slate-950 px-1.5 py-0.5 rounded ${textClass}`}>{srv.price} ج.م</span>}
                         </span>
                         {srv.desc && <span className="text-xs text-slate-500 mt-1">{srv.desc}</span>}
                       </div>
