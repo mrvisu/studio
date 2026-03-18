@@ -138,7 +138,7 @@
           reminder: "مرحباً أ. {name} 🌟. نود تذكيركم بأن هناك مبلغ متبقي لحسابكم في {studio} بقيمة {remaining} ج.م. \nرقم الإيصال: {receipt}.",
           ready: "أهلاً أ. {name} 🎉. الطلب الخاص بك جاهز للاستلام في {studio}! \nباقي الحساب: {remaining} ج.م. نورتنا وشرفتنا!",
           deposit: "تم استلام عربون بقيمة {paid} ج.م من أ. {name} في {studio} 💸. \nإجمالي الطلب: {total} ج.م \nالمتبقي: {remaining} ج.م. شكراً لك!",
-          tracking: "مرحباً أ. {name} 👋\nيمكنك الآن متابعة مراحل تجهيز طلبك (إيصال #{receipt}) لحظة بلحظة عبر الرابط التالي:\n{track_url}\n\nشرفتنا في {studio} 📸✨"
+          tracking: "مرحباً أ. {name} 👋\nيمكنك الآن متابعة مراحل تجهيز طلبك (إيصال #{receipt}) لحظة بلحظة عبر الرابط التالي:\n{track_url}\n\n💡 متاح سداد باقي الحساب إلكترونياً (إنستاباي/محافظ).\nشرفتنا في {studio} 📸✨"
         };
 
         const firebaseConfig = {
@@ -348,6 +348,44 @@
                           </div>
                       </div>
 
+                      {/* Electronic Payment Info Card (Appears only if there is remaining amount) */}
+                      {txn.remaining > 0 && (
+                          <div className="w-full max-w-md bg-gradient-to-br from-indigo-950 to-slate-900 p-6 rounded-3xl shadow-xl border border-indigo-500/30 mb-8 text-center relative overflow-hidden">
+                              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+                              <div className="flex justify-center mb-4">
+                                  <div className="bg-indigo-500/20 p-4 rounded-full text-indigo-400 shadow-lg shadow-indigo-900/20">
+                                      <i className="ph ph-wallet text-3xl"></i>
+                                  </div>
+                              </div>
+                              <h3 className="text-lg font-bold text-white mb-2">سداد إلكتروني متاح 💳</h3>
+                              <p className="text-sm text-indigo-200/80 leading-relaxed mb-5">
+                                  لراحتك، يمكنك الآن سداد باقي المبلغ المستحق (<b className="text-white">{txn.remaining} ج.م</b>) بكل سهولة عبر 
+                                  <span className="text-white font-bold mx-1">إنستاباي (InstaPay)</span> 
+                                  أو <span className="text-white font-bold mx-1">المحافظ الإلكترونية</span>.
+                              </p>
+                              <div className="bg-slate-950/80 py-3 px-4 rounded-2xl border border-indigo-500/20 flex flex-col items-center gap-1 shadow-inner">
+                                  <span className="text-xs text-indigo-300">رقم التحويل (فودافون كاش / إنستاباي):</span>
+                                  <div className="flex items-center gap-3 mt-1">
+                                      <span className="text-2xl font-black font-mono text-white tracking-widest">01126810107</span>
+                                      <button onClick={(e) => {
+                                          const el = document.createElement('textarea');
+                                          el.value = '01126810107';
+                                          document.body.appendChild(el);
+                                          el.select();
+                                          document.execCommand('copy');
+                                          document.body.removeChild(el);
+                                          const originalHTML = e.currentTarget.innerHTML;
+                                          e.currentTarget.innerHTML = '<i class="ph ph-check text-lg"></i>';
+                                          setTimeout(() => e.currentTarget.innerHTML = originalHTML, 2000);
+                                      }} className="text-indigo-400 hover:text-indigo-300 bg-indigo-900/30 p-2 rounded-lg transition-colors" title="نسخ الرقم">
+                                          <i className="ph ph-copy text-lg"></i>
+                                      </button>
+                                  </div>
+                              </div>
+                          </div>
+                      )}
+
+                      {/* Timeline */}
                       <div className="w-full max-w-md bg-slate-900 p-6 sm:p-8 rounded-3xl shadow-xl border border-slate-800 mb-8">
                           <h3 className="font-bold text-lg mb-8 flex items-center gap-2 border-b border-slate-800 pb-4"><i className="ph ph-clock-counter-clockwise text-blue-500"></i> مراحل تجهيز الطلب:</h3>
                           
