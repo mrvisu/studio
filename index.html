@@ -134,7 +134,7 @@
 
         const DEFAULT_WA_TEMPLATES = {
           welcome: "أهلاً بك أ. {name} في {studio} 📸. نورتنا وشرفتنا! تم تسجيل طلبك بنجاح. \nتفاصيل الطلب: {services}\nالإجمالي: {total} ج.م\nالمدفوع: {paid} ج.م\nالباقي: {remaining} ج.م",
-          invoice: "أهلاً بك أ. {name} 👋\nنورتنا وشرفتنا في {studio} 📸✨\n\n🧾 فاتورة إلكترونية\n----------------------------------\n🧾 رقم الإيصال: {receipt}\n📅 التاريخ: {date}\n----------------------------------\n🛠️ الخدمات المطلوبة:\n{services}\n----------------------------------\n💰 إجمالي الحساب: {total} ج.م\n✅ المدفوع: {paid} ج.م\n🔴 الباقي: {remaining} ج.م\n----------------------------------\n📍 لمتابعة حالة طلبك خطوة بخطوة، تفضل بزيارة الرابط التالي:\n{track_url}\n\nشكراً لثقتكم بنا!",
+          invoice: "أهلاً بك أ. {name} 👋\nنورتنا وشرفتنا في {studio} 📸✨\n\n🧾 فاتورة إلكترونية\n----------------------------------\n🧾 رقم الإيصال: {receipt}\n📅 التاريخ: {date}\n⏰ الوقت: {time}\n----------------------------------\n🛠️ الخدمات المطلوبة:\n{services}\n----------------------------------\n💰 إجمالي الحساب: {total} ج.م\n✅ المدفوع: {paid} ج.م\n🔴 الباقي: {remaining} ج.م\n----------------------------------\n📍 لمتابعة حالة طلبك خطوة بخطوة، تفضل بزيارة الرابط التالي:\n{track_url}\n\nشكراً لثقتكم بنا!",
           reminder: "مرحباً أ. {name} 🌟. نود تذكيركم بأن هناك مبلغ متبقي لحسابكم في {studio} بقيمة {remaining} ج.م. \nرقم الإيصال: {receipt}.",
           ready: "أهلاً أ. {name} 🎉. الطلب الخاص بك جاهز للاستلام في {studio}! \nباقي الحساب: {remaining} ج.م. نورتنا وشرفتنا!",
           deposit: "تم استلام عربون بقيمة {paid} ج.م من أ. {name} في {studio} 💸. \nإجمالي الطلب: {total} ج.م \nالمتبقي: {remaining} ج.م. شكراً لك!",
@@ -215,8 +215,11 @@
                     data.waTemplates.tracking = DEFAULT_WA_TEMPLATES.tracking;
                 }
                 
+                // تحديث قالب الفاتورة القديم ليتضمن رابط التتبع والرسالة الترحيبية ووقت التسجيل إذا لم يكن موجوداً
                 if (data.waTemplates.invoice && !data.waTemplates.invoice.includes('{track_url}')) {
                     data.waTemplates.invoice = DEFAULT_WA_TEMPLATES.invoice;
+                } else if (data.waTemplates.invoice && !data.waTemplates.invoice.includes('{time}')) {
+                    data.waTemplates.invoice = data.waTemplates.invoice.replace('📅 التاريخ: {date}', '📅 التاريخ: {date}\n⏰ الوقت: {time}');
                 }
 
                 setSettings(data);
@@ -268,6 +271,7 @@
           const formatCurrency = (num) => Number(num || 0).toLocaleString('ar-EG') + ' ج.م';
           const formatDate = (dateStr) => new Date(dateStr).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' });
           const formatDateOnly = (dateStr) => new Date(dateStr).toLocaleDateString('ar-EG');
+          const formatTimeOnly = (dateStr) => new Date(dateStr).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
           
           const generateWA_Message = (templateKey, txn) => {
             let msg = settings.waTemplates[templateKey] || "";
@@ -279,6 +283,7 @@
             msg = msg.replace(/{services}/g, txn.requirements || 'خدمات تصوير');
             msg = msg.replace(/{studio}/g, settings.studioName || 'الاستوديو');
             msg = msg.replace(/{date}/g, formatDateOnly(txn.dateTime));
+            msg = msg.replace(/{time}/g, formatTimeOnly(txn.dateTime));
             
             const trackUrl = window.location.href.split('?')[0] + `?phone=${encodeURIComponent(txn.phone)}&receipt=${encodeURIComponent(txn.receiptNo)}`;
             msg = msg.replace(/{track_url}/g, trackUrl);
@@ -295,9 +300,7 @@
 
           // --- Client Tracking View ---
           if (isTracking && authReady) {
-              const txn = transactions.find(t => t.phone === trackPhone && t.receiptNo.toString() === trackReceipt);
-
-              if (!dataLoaded || (!txn && !showNotFound)) {
+              if (!dataLoaded || (!transactions.find(t => t.phone === trackPhone && t.receiptNo.toString() === trackReceipt) && !showNotFound)) {
                   return (
                       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-100 p-6 text-center">
                           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -306,6 +309,8 @@
                       </div>
                   );
               }
+
+              const txn = transactions.find(t => t.phone === trackPhone && t.receiptNo.toString() === trackReceipt);
               
               if (!txn && showNotFound) return (
                   <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 p-6 text-center">
@@ -358,12 +363,13 @@
                                   </div>
                               </div>
                               <h3 className="text-lg font-bold text-white mb-2">سداد إلكتروني متاح 💳</h3>
-                              <p className="text-sm text-indigo-200/80 leading-relaxed mb-5">
+                              <p className="text-sm text-indigo-200/80 leading-relaxed mb-4">
                                   لراحتك، يمكنك الآن سداد باقي المبلغ المستحق (<b className="text-white">{txn.remaining} ج.م</b>) بكل سهولة عبر 
                                   <span className="text-white font-bold mx-1">إنستاباي (InstaPay)</span> 
                                   أو <span className="text-white font-bold mx-1">المحافظ الإلكترونية</span>.
                               </p>
-                              <div className="bg-slate-950/80 py-3 px-4 rounded-2xl border border-indigo-500/20 flex flex-col items-center gap-1 shadow-inner">
+                              
+                              <div className="bg-slate-950/80 py-3 px-4 rounded-2xl border border-indigo-500/20 flex flex-col items-center gap-1 shadow-inner mb-4">
                                   <span className="text-xs text-indigo-300">رقم التحويل (فودافون كاش / إنستاباي):</span>
                                   <div className="flex items-center gap-3 mt-1">
                                       <span className="text-2xl font-black font-mono text-white tracking-widest">01126810107</span>
@@ -382,6 +388,13 @@
                                       </button>
                                   </div>
                               </div>
+
+                              <button onClick={() => {
+                                  const confirmMsg = `مرحباً، قمت بتحويل مبلغ ${txn.remaining} ج.م لسداد باقي حساب إيصال رقم #${txn.receiptNo} باسم ${txn.clientName}.`;
+                                  openWhatsApp('01201260040', confirmMsg);
+                              }} className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-green-900/20 transition-all flex items-center justify-center gap-2">
+                                  <i className="ph ph-whatsapp-logo text-2xl"></i> تأكيد التحويل عبر واتساب
+                              </button>
                           </div>
                       )}
 
@@ -617,9 +630,9 @@
                     <div className="bg-slate-900 p-6 rounded-3xl shadow-xl border border-slate-800 w-full max-w-md relative">
                       <button onClick={() => setPayModal(null)} className="absolute top-4 left-4 p-2 text-slate-500 hover:text-red-400"><i className="ph ph-x text-2xl"></i></button>
                       <h3 className="text-2xl font-black mb-4 border-b border-slate-800 pb-4 text-slate-100">سداد باقي الحساب</h3>
-                      <div className="mb-6 bg-slate-950 p-4 rounded-xl space-y-2 border border-slate-800">
-                        <p className="text-slate-300">العميل: <b className="text-white">{payModal.clientName}</b></p>
-                        <p className="text-red-400 font-bold">الباقي: {payModal.remaining} ج.م</p>
+                      <div className="mb-6 bg-slate-950 p-4 rounded-xl text-center border border-slate-800">
+                        <p className="text-slate-300">العميل: <b className="text-white text-lg">{payModal.clientName}</b></p>
+                        <p className="text-red-400 font-bold mt-2">الباقي المستحق: {payModal.remaining} ج.م</p>
                       </div>
                       <form onSubmit={async (e) => {
                         e.preventDefault();
@@ -628,8 +641,8 @@
                         await setDoc(doc(db, `artifacts/studio-marakby/public/data/transactions`, updated.id), updated);
                         setPayModal(null);
                       }} className="space-y-4">
-                        <input type="number" name="amount" required min="1" max={payModal.remaining} defaultValue={payModal.remaining} className="w-full p-4 border border-slate-700 bg-slate-950 text-white rounded-xl text-2xl font-black text-center outline-none focus:border-green-500"/>
-                        <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-4 rounded-xl">تأكيد التحصيل</button>
+                        <input type="number" name="amount" required min="1" max={payModal.remaining} defaultValue={payModal.remaining} className="w-full p-4 border border-slate-700 bg-slate-950 text-white rounded-xl text-2xl font-black text-center outline-none focus:border-green-500 shadow-inner"/>
+                        <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-4 rounded-xl shadow-lg transition-all text-lg">تأكيد تحصيل المبلغ</button>
                       </form>
                     </div>
                   </div>
@@ -1005,13 +1018,17 @@
                 <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
                   <h2 className="text-xl font-bold mb-4 border-b border-slate-800 pb-4 text-slate-100"><i className="ph ph-whatsapp-logo text-green-400"></i> قوالب رسائل الواتساب</h2>
                   <div className="space-y-4">
+                    <p className="text-sm text-slate-400 bg-slate-800/50 p-4 rounded-xl border border-slate-700 leading-relaxed mb-6">
+                      استخدم المتغيرات التالية للإضافة التلقائية للبيانات: <br/>
+                      <code className="text-blue-400 font-bold mx-1 bg-slate-900 px-1 rounded">{'{name}'}</code> <code className="text-blue-400 font-bold mx-1 bg-slate-900 px-1 rounded">{'{receipt}'}</code> <code className="text-blue-400 font-bold mx-1 bg-slate-900 px-1 rounded">{'{total}'}</code> <code className="text-blue-400 font-bold mx-1 bg-slate-900 px-1 rounded">{'{remaining}'}</code> <code className="text-blue-400 font-bold mx-1 bg-slate-900 px-1 rounded">{'{date}'}</code> <code className="text-blue-400 font-bold mx-1 bg-slate-900 px-1 rounded">{'{time}'}</code> <code className="text-purple-400 font-bold mx-1 bg-slate-900 px-1 rounded">{'{studio}'}</code>
+                    </p>
                     {Object.keys(settings.waTemplates).map(key => (
                       <div key={key}>
                         <label className="block text-sm font-bold mb-2 text-slate-400">
                             {key === 'invoice' ? 'شكل الفاتورة الإلكترونية' : 
                              key === 'tracking' ? 'رسالة تتبع الطلب (يرسل معها الرابط تلقائياً)' : key}
                         </label>
-                        <textarea rows="3" value={settings.waTemplates[key]} onChange={e => setSettings({...settings, waTemplates: {...settings.waTemplates, [key]: e.target.value}})} className="w-full p-4 border border-slate-700 bg-slate-950 text-slate-300 rounded-xl focus:border-green-500 outline-none text-sm font-mono custom-scrollbar" />
+                        <textarea rows="4" value={settings.waTemplates[key]} onChange={e => setSettings({...settings, waTemplates: {...settings.waTemplates, [key]: e.target.value}})} className="w-full p-4 border border-slate-700 bg-slate-950 text-slate-300 rounded-xl focus:border-green-500 outline-none text-sm font-mono custom-scrollbar" />
                       </div>
                     ))}
                   </div>
