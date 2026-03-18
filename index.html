@@ -160,7 +160,7 @@
           const urlParams = new URLSearchParams(window.location.search);
           const trackPhone = urlParams.get('phone');
           const trackReceipt = urlParams.get('receipt');
-          const trackType = urlParams.get('type') || 't'; // 't' for normal, 'w' for wedding
+          const trackType = urlParams.get('type') || 't'; 
           const isTracking = trackPhone && trackReceipt;
 
           useEffect(() => {
@@ -240,7 +240,7 @@
             return () => clearTimeout(timer);
           }, [settings, user, isTracking]);
 
-          // فترة سماح وتسجيل مشاهدة العميل
+          // Client View Tracking & Recording
           useEffect(() => {
               if (isTracking && dataLoaded) {
                   const targetArr = trackType === 'w' ? weddings : transactions;
@@ -251,7 +251,6 @@
                       return () => clearTimeout(timer);
                   } else {
                       setShowNotFound(false);
-                      // تحديث حالة القراءة
                       if (!currentTxn.viewedByClient) {
                           const appId = 'studio-marakby';
                           const targetCol = trackType === 'w' ? 'weddings' : 'transactions';
@@ -276,7 +275,10 @@
              if(!dateStr) return '';
              return new Date(dateStr).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' });
           };
-          const formatDateOnly = (dateStr) => new Date(dateStr).toLocaleDateString('ar-EG');
+          const formatDateOnly = (dateStr) => {
+             if(!dateStr) return '';
+             return new Date(dateStr).toLocaleDateString('ar-EG');
+          }
           const formatTimeOnly = (dateStr) => {
              if(!dateStr) return '';
              const d = new Date(dateStr);
@@ -286,11 +288,14 @@
           
           const generateWA_Message = (templateKey, txn, isWedding = false) => {
             let msg = settings.waTemplates[templateKey] || "";
-            const clientName = isWedding ? `${txn.groomName} و ${txn.brideName}` : txn.clientName;
+            const clientName = isWedding ? `${txn.groomName || ''} و ${txn.brideName || ''}`.trim() : txn.clientName;
             
             let reqs = '';
             if (isWedding) {
-                if (txn.package && txn.package.name) reqs += `الباقة: ${txn.package.name}\n`;
+                const pkgs = txn.packages && txn.packages.length > 0 
+                             ? txn.packages.map(p=>p.name).join(' + ') 
+                             : (txn.package ? txn.package.name : '');
+                if (pkgs) reqs += `الباقات: ${pkgs}\n`;
                 if (txn.weddingDate) reqs += `موعد الزفاف: ${formatDateOnly(txn.weddingDate)}\n`;
                 if (txn.location) reqs += `مكان التصوير: ${txn.location}\n`;
                 if (txn.makeupArtist) reqs += `الميك أب: ${txn.makeupArtist}\n`;
@@ -298,7 +303,9 @@
                 if (txn.sessionType) reqs += `نوع السيشن: ${txn.sessionType}\n`;
                 if (txn.casualShootDate) reqs += `تصوير الكاجوال: ${formatDateOnly(txn.casualShootDate)}\n`;
                 if (txn.groomAddress) reqs += `عنوان العريس: ${txn.groomAddress}\n`;
-                if (txn.addons && txn.addons.length > 0) reqs += `إضافات أخرى: ${txn.addons.map(a=>a.name).join(' + ')}\n`;
+                if (txn.addons && txn.addons.length > 0) {
+                    reqs += `إضافات أخرى: ${txn.addons.map(a => `${a.name}${a.notes ? ' ('+a.notes+')' : ''}`).join(' + ')}\n`;
+                }
             } else {
                 reqs = txn.requirements || 'خدمات تصوير';
             }
@@ -320,6 +327,7 @@
           };
 
           const openWhatsApp = (phone, msg) => {
+            if(!phone) return;
             let formattedPhone = phone.trim();
             if (formattedPhone.startsWith('0')) formattedPhone = '2' + formattedPhone;
             else if (!formattedPhone.startsWith('2')) formattedPhone = '20' + formattedPhone;
@@ -353,15 +361,16 @@
               
               const currentStatus = txn.status || 0;
               const isWedding = trackType === 'w';
-              const displayName = isWedding ? `${txn.groomName} و ${txn.brideName}` : txn.clientName;
+              const displayName = isWedding ? `${txn.groomName || ''} و ${txn.brideName || ''}`.trim() : txn.clientName;
               
               let displayReqs = '';
               if (isWedding) {
-                  if (txn.package && txn.package.name) displayReqs += `الباقة: ${txn.package.name}\n`;
+                  const pkgs = txn.packages && txn.packages.length > 0 ? txn.packages.map(p=>p.name).join(' + ') : (txn.package ? txn.package.name : '');
+                  if (pkgs) displayReqs += `الباقات: ${pkgs}\n`;
                   if (txn.location) displayReqs += `اللوكيشن/القاعة: ${txn.location}\n`;
                   if (txn.makeupArtist) displayReqs += `الميك أب: ${txn.makeupArtist}\n`;
                   if (txn.sessionType) displayReqs += `نوع السيشن: ${txn.sessionType}\n`;
-                  if (txn.addons && txn.addons.length > 0) displayReqs += `إضافات: ${txn.addons.map(a=>a.name).join(' + ')}\n`;
+                  if (txn.addons && txn.addons.length > 0) displayReqs += `إضافات: ${txn.addons.map(a => `${a.name}${a.notes ? ' ('+a.notes+')' : ''}`).join(' + ')}\n`;
               } else {
                   displayReqs = txn.requirements;
               }
@@ -423,10 +432,10 @@
                               <div className="bg-slate-950/80 py-3 px-4 rounded-2xl border border-indigo-500/20 flex flex-col items-center gap-1 shadow-inner mb-4">
                                   <span className="text-xs text-indigo-300">رقم التحويل (فودافون كاش / إنستاباي):</span>
                                   <div className="flex items-center gap-3 mt-1">
-                                      <span className="text-2xl font-black font-mono text-white tracking-widest">01126810107</span>
+                                      <span className="text-2xl font-black font-mono text-white tracking-widest">01201260040</span>
                                       <button onClick={(e) => {
                                           const el = document.createElement('textarea');
-                                          el.value = '01126810107';
+                                          el.value = '01201260040';
                                           document.body.appendChild(el);
                                           el.select();
                                           document.execCommand('copy');
@@ -592,6 +601,127 @@
             );
           };
 
+          // --- TransactionCard (Shared Component) ---
+          const TransactionCard = ({ txn, onDelete, onEdit, onPayRemaining, onViewReceipt, sendInvoice, updateStatus, onViewDetails }) => {
+            const [showWaMenu, setShowWaMenu] = useState(false);
+            const currentStatus = txn.status || 0;
+            const cashPaid = (txn.paid || 0) - (txn.electronicPaid || 0);
+            const isWedding = txn.type === 'wedding';
+            const displayName = isWedding ? `${txn.groomName} و ${txn.brideName}` : txn.clientName;
+
+            return (
+              <div className="bg-slate-900 p-5 rounded-2xl shadow-sm border border-slate-800 flex flex-col md:flex-row gap-6 justify-between hover:border-slate-700 transition-all cursor-pointer group" onClick={() => onViewDetails && onViewDetails(txn)}>
+                <div className="flex-1 flex flex-col justify-between">
+                  <div className="space-y-3">
+                      <div className="flex justify-between items-start">
+                        <h3 className={`text-lg font-bold flex items-center gap-2 transition-colors ${isWedding ? 'text-pink-100 group-hover:text-pink-400' : 'text-slate-100 group-hover:text-blue-400'}`}>
+                           {isWedding ? <i className="ph ph-heart text-pink-500 text-2xl group-hover:text-pink-400"></i> : <i className="ph ph-user-circle text-slate-500 text-2xl group-hover:text-blue-500"></i>}
+                           {displayName}
+                        </h3>
+                        <div className="flex items-center gap-2">
+                           {txn.viewedByClient ? (
+                               <span className="text-blue-400 flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-blue-950/30 px-2 py-1 rounded border border-blue-900/50" title={`تمت المشاهدة في: ${formatDate(txn.viewTime)}`}>
+                                   <i className="ph ph-checks text-sm sm:text-base"></i> تمت المشاهدة
+                               </span>
+                           ) : (
+                               <span className="text-slate-500 flex items-center gap-1 text-[10px] sm:text-xs bg-slate-800/50 px-2 py-1 rounded border border-slate-700" title="لم يتم فتح الرابط بعد">
+                                   <i className="ph ph-check text-sm sm:text-base"></i> لم يُشاهد
+                               </span>
+                           )}
+                           <span className="bg-slate-800 text-slate-400 text-xs px-2 py-1 rounded border border-slate-700 font-mono">#{txn.receiptNo}</span>
+                        </div>
+                      </div>
+                      <div className="text-sm text-slate-400 flex flex-wrap gap-x-4">
+                        <span>📞 {txn.phone}</span>
+                        <span>⏱️ {formatDate(txn.dateTime)}</span>
+                        {isWedding && txn.weddingDate && <span className="text-pink-400">💍 {formatDateOnly(txn.weddingDate)}</span>}
+                      </div>
+                      
+                      <div className="flex flex-col gap-3 pt-2 text-sm">
+                        <div className="flex flex-wrap gap-2 items-center bg-slate-950 p-3 rounded-xl border border-slate-800/50 mt-1">
+                          <span className="text-slate-300">الإجمالي: <b className="text-white">{txn.total}</b></span>
+                          <div className="hidden sm:block w-px h-4 bg-slate-700 mx-1"></div>
+                          <span className="text-green-400">المدفوع: <b className="text-green-300">{txn.paid}</b></span>
+                          {(cashPaid > 0 || txn.electronicPaid > 0) && <div className="hidden sm:block w-px h-4 bg-slate-700 mx-1"></div>}
+                          {cashPaid > 0 && <span className="text-emerald-400 text-xs bg-emerald-950/30 px-2 py-1 rounded border border-emerald-900/50 flex items-center gap-1"><i className="ph ph-money text-base"></i> نقدي: {cashPaid}</span>}
+                          {txn.electronicPaid > 0 && <span className="text-indigo-400 text-xs bg-indigo-950/30 px-2 py-1 rounded border border-indigo-900/50 flex items-center gap-1"><i className="ph ph-wallet text-base"></i> إلكتروني: {txn.electronicPaid}</span>}
+                          <div className="hidden sm:block w-px h-4 bg-slate-700 mx-1"></div>
+                          <span className={txn.remaining > 0 ? "text-red-400" : "text-green-400"}>الباقي: <b>{txn.remaining}</b></span>
+                        </div>
+                      </div>
+
+                      {txn.pendingReceipt && (
+                          <div className="mt-3 p-3 bg-indigo-950/20 border border-indigo-500/30 rounded-xl flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
+                              <img 
+                                  src={txn.pendingReceipt} 
+                                  alt="إيصال تحويل مرفق" 
+                                  className="w-14 h-14 object-cover rounded-lg cursor-pointer border border-indigo-500/50 hover:scale-105 transition-transform shadow-md"
+                                  onClick={() => onViewReceipt(txn.pendingReceipt)}
+                                  title="اضغط للتكبير"
+                              />
+                              <div>
+                                  <h4 className="text-sm font-bold text-indigo-300 flex items-center gap-1"><i className="ph ph-warning-circle text-lg"></i> إيصال قيد المراجعة</h4>
+                                  <p className="text-xs text-indigo-200/70 mt-1">العميل قام برفع إيصال، راجع الصورة ثم اضغط (سداد إلكتروني) لتأكيد التحصيل وإضافته.</p>
+                              </div>
+                          </div>
+                      )}
+                  </div>
+
+                  <div className="mt-5 pt-4 border-t border-slate-800" onClick={e => e.stopPropagation()}>
+                    <h4 className="text-xs font-bold text-slate-400 mb-3">تحديث حالة الطلب (التتبع):</h4>
+                    <div className="flex gap-2">
+                        {ORDER_STATUSES.map(s => (
+                            <button
+                                key={s.id}
+                                onClick={() => updateStatus(txn.id, s.id)}
+                                className={`flex-1 py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center gap-1 border ${currentStatus === s.id ? s.activeClass : s.inactiveClass}`}
+                            >
+                                <i className={`ph ${s.icon} text-lg`}></i>
+                                <span className="text-[10px] sm:text-xs text-center">{s.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 min-w-[160px] justify-start border-t md:border-t-0 md:border-r border-slate-800 pt-4 md:pt-0 md:pr-6" onClick={e => e.stopPropagation()}>
+                  <button onClick={sendInvoice} className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-sm">
+                    <i className="ph ph-receipt text-xl"></i> إرسال الفاتورة
+                  </button>
+                  
+                  <div className="relative w-full">
+                    <button onClick={() => setShowWaMenu(!showWaMenu)} className="w-full bg-green-600 hover:bg-green-500 text-white px-3 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all">
+                      <i className="ph ph-whatsapp-logo text-xl"></i> رسائل واتساب
+                    </button>
+                    {showWaMenu && (
+                      <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-10 p-1 flex flex-col overflow-hidden">
+                        <button onClick={() => {openWhatsApp(txn.phone, generateWA_Message('tracking', txn, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2.5 text-sm text-blue-300 hover:bg-slate-700 font-bold border-b border-slate-700">📍 رابط التتبع للعميل</button>
+                        <button onClick={() => {openWhatsApp(txn.phone, generateWA_Message('welcome', txn, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-slate-200 hover:bg-slate-700">👋 رسالة ترحيب</button>
+                        <button onClick={() => {openWhatsApp(txn.phone, generateWA_Message('ready', txn, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-slate-200 hover:bg-slate-700">🎉 الشغل خلص</button>
+                        <button onClick={() => {openWhatsApp(txn.phone, generateWA_Message('reminder', txn, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-slate-200 hover:bg-slate-700">⚠️ تذكير بالباقي</button>
+                      </div>
+                    )}
+                  </div>
+
+                  {txn.remaining > 0 && (
+                      <div className="flex gap-2 w-full mt-2">
+                        <button onClick={() => onPayRemaining({...txn, paymentType: 'cash'})} className="flex-1 bg-yellow-500 hover:bg-yellow-400 text-slate-900 px-2 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all shadow-sm"><i className="ph ph-money text-lg"></i> نقدي</button>
+                        <button onClick={() => onPayRemaining({...txn, paymentType: 'electronic'})} className="flex-1 bg-indigo-500 hover:bg-indigo-400 text-white px-2 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all shadow-sm"><i className="ph ph-wallet text-lg"></i> إلكتروني</button>
+                      </div>
+                  )}
+
+                  {onEdit && (
+                    <button onClick={() => onEdit(txn)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all mt-2">
+                        <i className="ph ph-pencil-simple text-xl"></i> تعديل البيانات
+                    </button>
+                  )}
+                  
+                  <button onClick={() => onDelete(txn.id)} className="bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-900/30 px-3 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all mt-auto"><i className="ph ph-trash text-xl"></i> حذف الإيصال</button>
+                </div>
+              </div>
+            );
+          };
+
           // --- Dashboard Tab (Main) ---
           const DashboardTab = () => {
             const [showAddModal, setShowAddModal] = useState(false);
@@ -729,7 +859,7 @@
 
                 {showAddModal && (
                   <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-slate-900 p-6 rounded-3xl shadow-2xl border border-slate-800 w-full max-w-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+                    <div className="bg-slate-900 p-6 rounded-3xl shadow-2xl border border-slate-800 w-full max-w-4xl relative max-h-[90vh] overflow-y-auto custom-scrollbar">
                       <button onClick={() => setShowAddModal(false)} className="absolute top-4 left-4 p-2 text-slate-500 hover:text-red-400"><i className="ph ph-x text-xl"></i></button>
                       <h2 className="text-xl font-black mb-6 text-slate-100 border-b border-slate-800 pb-3">{isEditing ? 'تعديل العملية' : 'إضافة عملية جديدة'}</h2>
                       <form onSubmit={handleSubmit} className="space-y-4">
@@ -739,7 +869,7 @@
                         <input type="text" placeholder="اسم العميل" required className="w-full p-3 border border-slate-700 bg-slate-950 text-white placeholder-slate-500 rounded-xl focus:border-blue-500 outline-none text-sm" value={formData.clientName} onChange={e => setFormData({...formData, clientName: e.target.value})} />
                         <div className="flex gap-3">
                           <input type="tel" placeholder="رقم الهاتف" required className="w-full p-3 border border-slate-700 bg-slate-950 text-white placeholder-slate-500 rounded-xl focus:border-blue-500 outline-none text-sm" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
-                          <input type="text" placeholder="رقم الصورة" className="w-1/2 p-3 border border-slate-700 bg-slate-950 text-white placeholder-slate-500 rounded-xl focus:border-blue-500 outline-none text-sm" value={formData.photoNo} onChange={e => setFormData({...formData, photoNo: e.target.value})} />
+                          <input type="text" placeholder="رقم الصورة (اختياري)" className="w-1/2 p-3 border border-slate-700 bg-slate-950 text-white placeholder-slate-500 rounded-xl focus:border-blue-500 outline-none text-sm" value={formData.photoNo} onChange={e => setFormData({...formData, photoNo: e.target.value})} />
                         </div>
                         <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
                           <div className="flex justify-between items-center mb-3">
@@ -762,11 +892,11 @@
                             })}
                           </div>
 
-                          <textarea placeholder="المطلوب بالتفصيل..." required rows="2" className="w-full p-3 mt-2 border border-slate-700 bg-slate-900 text-white placeholder-slate-500 rounded-xl focus:border-blue-500 outline-none text-sm custom-scrollbar" value={formData.requirements} onChange={e => setFormData({...formData, requirements: e.target.value})} />
+                          <textarea placeholder="المطلوب بالتفصيل..." rows="2" className="w-full p-3 mt-2 border border-slate-700 bg-slate-900 text-white placeholder-slate-500 rounded-xl focus:border-blue-500 outline-none text-sm custom-scrollbar" value={formData.requirements} onChange={e => setFormData({...formData, requirements: e.target.value})} />
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                          <input type="number" placeholder="الإجمالي" required className="p-3 border border-slate-700 bg-slate-950 text-white rounded-xl outline-none focus:border-blue-500 text-sm font-bold" value={formData.total} onChange={e => setFormData({...formData, total: e.target.value})} />
-                          <input type="number" placeholder="المدفوع الان" required className="p-3 border border-slate-700 bg-slate-950 text-white rounded-xl outline-none focus:border-green-500 text-sm font-bold" value={formData.paid} onChange={e => setFormData({...formData, paid: e.target.value})} />
+                          <input type="number" placeholder="الإجمالي" className="p-3 border border-slate-700 bg-slate-950 text-white rounded-xl outline-none focus:border-blue-500 text-sm font-bold" value={formData.total} onChange={e => setFormData({...formData, total: e.target.value})} />
+                          <input type="number" placeholder="المدفوع الان" className="p-3 border border-slate-700 bg-slate-950 text-white rounded-xl outline-none focus:border-green-500 text-sm font-bold" value={formData.paid} onChange={e => setFormData({...formData, paid: e.target.value})} />
                           {!isEditing && (
                               <select className="p-3 border border-slate-700 bg-slate-950 text-white rounded-xl outline-none focus:border-indigo-500 col-span-2 md:col-span-1 text-sm font-bold" value={formData.paymentMethod} onChange={e => setFormData({...formData, paymentMethod: e.target.value})}>
                                  <option value="cash">دفع نقدي</option>
@@ -774,8 +904,8 @@
                               </select>
                           )}
                         </div>
-                        <div className={`p-3 rounded-xl text-center font-black text-lg border ${(formData.total - formData.paid) > 0 ? 'bg-red-950/40 text-red-400 border-red-900/50' : 'bg-green-950/40 text-green-400 border-green-900/50'}`}>
-                          الباقي: {formatCurrency((formData.total || 0) - (formData.paid || 0))}
+                        <div className={`p-3 rounded-xl text-center font-black text-lg border ${(parseFloat(formData.total)||0 - parseFloat(formData.paid)||0) > 0 ? 'bg-red-950/40 text-red-400 border-red-900/50' : 'bg-green-950/40 text-green-400 border-green-900/50'}`}>
+                          الباقي: {formatCurrency((parseFloat(formData.total) || 0) - (parseFloat(formData.paid) || 0))}
                         </div>
                         <button type="submit" className="w-full bg-blue-600 text-white hover:bg-blue-500 font-black py-3 rounded-xl shadow-lg text-sm"><i className="ph ph-floppy-disk text-lg ml-2 align-middle"></i>حفظ</button>
                       </form>
@@ -785,14 +915,14 @@
                 
                 {payModal && (
                   <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-slate-900 p-6 rounded-3xl shadow-xl border border-slate-800 w-full max-w-md relative">
-                      <button onClick={() => setPayModal(null)} className="absolute top-4 left-4 p-2 text-slate-500 hover:text-red-400"><i className="ph ph-x text-2xl"></i></button>
-                      <h3 className="text-2xl font-black mb-4 border-b border-slate-800 pb-4 text-center text-slate-100">
+                    <div className="bg-slate-900 p-5 rounded-2xl shadow-xl border border-slate-800 w-full max-w-sm relative">
+                      <button onClick={() => setPayModal(null)} className="absolute top-3 left-3 p-2 text-slate-500 hover:text-red-400"><i className="ph ph-x text-xl"></i></button>
+                      <h3 className="text-xl font-black mb-3 border-b border-slate-800 pb-3 text-center text-slate-100">
                           {payModal.paymentType === 'electronic' ? 'سداد إلكتروني (إنستاباي/محافظ)' : 'سداد نقدي'}
                       </h3>
-                      <div className="mb-6 bg-slate-950 p-4 rounded-xl text-center border border-slate-800">
-                        <p className="text-slate-300">العميل: <b className="text-white text-lg">{payModal.type === 'wedding' ? payModal.groomName : payModal.clientName}</b></p>
-                        <p className="text-red-400 font-bold mt-2">الباقي المستحق: {payModal.remaining} ج.م</p>
+                      <div className="mb-4 bg-slate-950 p-3 rounded-xl text-center border border-slate-800">
+                        <p className="text-slate-400 text-sm">العميل: <b className="text-white text-base">{payModal.type === 'wedding' ? payModal.groomName : payModal.clientName}</b></p>
+                        <p className="text-red-400 font-bold mt-1 text-sm">الباقي المستحق: {payModal.remaining} ج.م</p>
                       </div>
                       <form onSubmit={async (e) => {
                         e.preventDefault();
@@ -808,9 +938,9 @@
                         const targetCol = updated.type === 'wedding' ? 'weddings' : 'transactions';
                         await setDoc(doc(db, `artifacts/studio-marakby/public/data/${targetCol}`, updated.id), updated);
                         setPayModal(null);
-                      }} className="space-y-4">
-                        <input type="number" name="amount" required min="1" max={payModal.remaining} defaultValue={payModal.remaining} className="w-full p-4 border border-slate-700 bg-slate-950 text-white rounded-xl text-2xl font-black text-center outline-none focus:border-blue-500 shadow-inner"/>
-                        <button type="submit" className={`w-full text-white font-black py-4 rounded-xl shadow-lg transition-all text-lg ${payModal.paymentType === 'electronic' ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/20' : 'bg-green-600 hover:bg-green-500 shadow-green-900/20'}`}>تأكيد تحصيل المبلغ</button>
+                      }} className="space-y-3">
+                        <input type="number" name="amount" required min="1" max={payModal.remaining} defaultValue={payModal.remaining} className="w-full p-3 border border-slate-700 bg-slate-950 text-white rounded-xl text-xl font-black text-center outline-none focus:border-blue-500 shadow-inner"/>
+                        <button type="submit" className={`w-full text-white font-black py-3 rounded-xl shadow-lg transition-all text-base ${payModal.paymentType === 'electronic' ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/20' : 'bg-green-600 hover:bg-green-500 shadow-green-900/20'}`}>تأكيد تحصيل المبلغ</button>
                       </form>
                     </div>
                   </div>
@@ -863,7 +993,7 @@
                            <p className="text-slate-500 text-xs mb-2">المطلوب (الخدمات والمنتجات)</p>
                            <p className="text-slate-200 leading-relaxed font-medium whitespace-pre-wrap">
                                {txnDetailsModal.type === 'wedding' 
-                                   ? `الباقة: ${txnDetailsModal.package?.name}\nالسيشن: ${txnDetailsModal.sessionType}\nالكاجوال: ${txnDetailsModal.casualShootDate ? formatDateOnly(txnDetailsModal.casualShootDate) : 'بدون'}\nإضافات: ${txnDetailsModal.addons?.length > 0 ? txnDetailsModal.addons.map(a=>a.name).join(' + ') : 'بدون'}`
+                                   ? `الباقات: ${txnDetailsModal.packages?.length > 0 ? txnDetailsModal.packages.map(p=>p.name).join(' + ') : (txnDetailsModal.package ? txnDetailsModal.package.name : 'بدون')}\nالسيشن: ${txnDetailsModal.sessionType}\nالكاجوال: ${txnDetailsModal.casualShootDate ? formatDateOnly(txnDetailsModal.casualShootDate) : 'بدون'}\nإضافات: ${txnDetailsModal.addons?.length > 0 ? txnDetailsModal.addons.map(a=>`${a.name}${a.notes ? ' ('+a.notes+')' : ''}`).join(' + ') : 'بدون'}`
                                    : txnDetailsModal.requirements}
                            </p>
                         </div>
@@ -905,340 +1035,329 @@
             );
           };
 
-          const TransactionCard = ({ txn, onDelete, onEdit, onPayRemaining, onViewReceipt, sendInvoice, updateStatus, onViewDetails }) => {
-            const [showWaMenu, setShowWaMenu] = useState(false);
-            const currentStatus = txn.status || 0;
-            const cashPaid = (txn.paid || 0) - (txn.electronicPaid || 0);
-            const isWedding = txn.type === 'wedding';
-            const displayName = isWedding ? `${txn.groomName} و ${txn.brideName}` : txn.clientName;
-
-            return (
-              <div className="bg-slate-900 p-5 rounded-2xl shadow-sm border border-slate-800 flex flex-col md:flex-row gap-6 justify-between hover:border-slate-700 transition-all cursor-pointer group" onClick={() => onViewDetails && onViewDetails(txn)}>
-                <div className="flex-1 flex flex-col justify-between">
-                  <div className="space-y-3">
-                      <div className="flex justify-between items-start">
-                        <h3 className={`text-lg font-bold flex items-center gap-2 transition-colors ${isWedding ? 'text-pink-100 group-hover:text-pink-400' : 'text-slate-100 group-hover:text-blue-400'}`}>
-                           {isWedding ? <i className="ph ph-heart text-pink-500 text-2xl group-hover:text-pink-400"></i> : <i className="ph ph-user-circle text-slate-500 text-2xl group-hover:text-blue-500"></i>}
-                           {displayName}
-                        </h3>
-                        <div className="flex items-center gap-2">
-                           {txn.viewedByClient ? (
-                               <span className="text-blue-400 flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-blue-950/30 px-2 py-1 rounded border border-blue-900/50" title={`تمت المشاهدة في: ${formatDate(txn.viewTime)}`}>
-                                   <i className="ph ph-checks text-sm sm:text-base"></i> تمت المشاهدة
-                               </span>
-                           ) : (
-                               <span className="text-slate-500 flex items-center gap-1 text-[10px] sm:text-xs bg-slate-800/50 px-2 py-1 rounded border border-slate-700" title="لم يتم فتح الرابط بعد">
-                                   <i className="ph ph-check text-sm sm:text-base"></i> لم يُشاهد
-                               </span>
-                           )}
-                           <span className="bg-slate-800 text-slate-400 text-xs px-2 py-1 rounded border border-slate-700 font-mono">#{txn.receiptNo}</span>
-                        </div>
-                      </div>
-                      <div className="text-sm text-slate-400 flex flex-wrap gap-x-4">
-                        <span>📞 {txn.phone}</span>
-                        <span>⏱️ {formatDate(txn.dateTime)}</span>
-                        {isWedding && <span className="text-pink-400">💍 {formatDateOnly(txn.weddingDate)}</span>}
-                      </div>
-                      
-                      <div className="flex flex-col gap-3 pt-2 text-sm">
-                        <div className="flex flex-wrap gap-2 items-center bg-slate-950 p-3 rounded-xl border border-slate-800/50 mt-1">
-                          <span className="text-slate-300">الإجمالي: <b className="text-white">{txn.total}</b></span>
-                          <div className="hidden sm:block w-px h-4 bg-slate-700 mx-1"></div>
-                          <span className="text-green-400">المدفوع: <b className="text-green-300">{txn.paid}</b></span>
-                          {(cashPaid > 0 || txn.electronicPaid > 0) && <div className="hidden sm:block w-px h-4 bg-slate-700 mx-1"></div>}
-                          {cashPaid > 0 && <span className="text-emerald-400 text-xs bg-emerald-950/30 px-2 py-1 rounded border border-emerald-900/50 flex items-center gap-1"><i className="ph ph-money text-base"></i> نقدي: {cashPaid}</span>}
-                          {txn.electronicPaid > 0 && <span className="text-indigo-400 text-xs bg-indigo-950/30 px-2 py-1 rounded border border-indigo-900/50 flex items-center gap-1"><i className="ph ph-wallet text-base"></i> إلكتروني: {txn.electronicPaid}</span>}
-                          <div className="hidden sm:block w-px h-4 bg-slate-700 mx-1"></div>
-                          <span className={txn.remaining > 0 ? "text-red-400" : "text-green-400"}>الباقي: <b>{txn.remaining}</b></span>
-                        </div>
-                      </div>
-
-                      {txn.pendingReceipt && (
-                          <div className="mt-3 p-3 bg-indigo-950/20 border border-indigo-500/30 rounded-xl flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
-                              <img 
-                                  src={txn.pendingReceipt} 
-                                  alt="إيصال تحويل مرفق" 
-                                  className="w-14 h-14 object-cover rounded-lg cursor-pointer border border-indigo-500/50 hover:scale-105 transition-transform shadow-md"
-                                  onClick={() => onViewReceipt(txn.pendingReceipt)}
-                                  title="اضغط للتكبير"
-                              />
-                              <div>
-                                  <h4 className="text-sm font-bold text-indigo-300 flex items-center gap-1"><i className="ph ph-warning-circle text-lg"></i> إيصال قيد المراجعة</h4>
-                                  <p className="text-xs text-indigo-200/70 mt-1">العميل قام برفع إيصال، راجع الصورة ثم اضغط (سداد إلكتروني) لتأكيد التحصيل وإضافته.</p>
-                              </div>
-                          </div>
-                      )}
-                  </div>
-
-                  <div className="mt-5 pt-4 border-t border-slate-800" onClick={e => e.stopPropagation()}>
-                    <h4 className="text-xs font-bold text-slate-400 mb-3">تحديث حالة الطلب (التتبع):</h4>
-                    <div className="flex gap-2">
-                        {ORDER_STATUSES.map(s => (
-                            <button
-                                key={s.id}
-                                onClick={() => updateStatus(txn.id, s.id)}
-                                className={`flex-1 py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center gap-1 border ${currentStatus === s.id ? s.activeClass : s.inactiveClass}`}
-                            >
-                                <i className={`ph ${s.icon} text-lg`}></i>
-                                <span className="text-[10px] sm:text-xs text-center">{s.label}</span>
-                            </button>
-                        ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2 min-w-[160px] justify-start border-t md:border-t-0 md:border-r border-slate-800 pt-4 md:pt-0 md:pr-6" onClick={e => e.stopPropagation()}>
-                  <button onClick={sendInvoice} className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-sm">
-                    <i className="ph ph-receipt text-xl"></i> إرسال الفاتورة
-                  </button>
-                  
-                  <div className="relative w-full">
-                    <button onClick={() => setShowWaMenu(!showWaMenu)} className="w-full bg-green-600 hover:bg-green-500 text-white px-3 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all">
-                      <i className="ph ph-whatsapp-logo text-xl"></i> رسائل واتساب
-                    </button>
-                    {showWaMenu && (
-                      <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-10 p-1 flex flex-col overflow-hidden">
-                        <button onClick={() => {openWhatsApp(txn.phone, generateWA_Message('tracking', txn, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2.5 text-sm text-blue-300 hover:bg-slate-700 font-bold border-b border-slate-700">📍 رابط التتبع للعميل</button>
-                        <button onClick={() => {openWhatsApp(txn.phone, generateWA_Message('welcome', txn, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-slate-200 hover:bg-slate-700">👋 رسالة ترحيب</button>
-                        <button onClick={() => {openWhatsApp(txn.phone, generateWA_Message('ready', txn, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-slate-200 hover:bg-slate-700">🎉 الشغل خلص</button>
-                        <button onClick={() => {openWhatsApp(txn.phone, generateWA_Message('reminder', txn, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-slate-200 hover:bg-slate-700">⚠️ تذكير بالباقي</button>
-                      </div>
-                    )}
-                  </div>
-
-                  {txn.remaining > 0 && (
-                      <div className="flex gap-2 w-full mt-2">
-                        <button onClick={() => onPayRemaining({...txn, paymentType: 'cash'})} className="flex-1 bg-yellow-500 hover:bg-yellow-400 text-slate-900 px-2 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all shadow-sm"><i className="ph ph-money text-lg"></i> نقدي</button>
-                        <button onClick={() => onPayRemaining({...txn, paymentType: 'electronic'})} className="flex-1 bg-indigo-500 hover:bg-indigo-400 text-white px-2 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all shadow-sm"><i className="ph ph-wallet text-lg"></i> إلكتروني</button>
-                      </div>
-                  )}
-
-                  {onEdit && (
-                    <button onClick={() => onEdit(txn)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all mt-2">
-                        <i className="ph ph-pencil-simple text-xl"></i> تعديل البيانات
-                    </button>
-                  )}
-                  
-                  <button onClick={() => onDelete(txn.id)} className="bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-900/30 px-3 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all mt-auto"><i className="ph ph-trash text-xl"></i> حذف الإيصال</button>
-                </div>
-              </div>
-            );
-          };
-
-          const ExpensesTab = () => {
-            const [expData, setExpData] = useState({ amount: '', category: settings.expenseCategories[0], notes: '' });
+          // --- Weddings Tab (New) ---
+          const WeddingsTab = () => {
+            const [showAddModal, setShowAddModal] = useState(false);
+            const [isEditing, setIsEditing] = useState(false);
+            const [query, setQuery] = useState('');
+            const [payModal, setPayModal] = useState(null);
+            const [receiptImageModal, setReceiptImageModal] = useState(null);
+            const [txnDetailsModal, setTxnDetailsModal] = useState(null);
             
-            const handleAddExpense = async (e) => {
-              e.preventDefault();
-              const newExp = { id: Date.now().toString(), date: new Date().toISOString(), amount: parseFloat(expData.amount), category: expData.category, notes: expData.notes, month: new Date().getMonth() + 1, year: new Date().getFullYear() };
-              const appId = 'studio-marakby';
-              await setDoc(doc(db, `artifacts/${appId}/public/data/expenses`, newExp.id), newExp);
-              setExpData({ amount: '', category: settings.expenseCategories[0], notes: '' });
+            const [formData, setFormData] = useState({
+                groomName: '', brideName: '', phone: '', groomAddress: '',
+                weddingDate: '', location: '', makeupArtist: '', leaveTime: '',
+                sessionType: '', casualShootDate: '',
+                packages: [], addons: [],
+                total: '', paid: '', paymentMethod: 'cash'
+            });
+
+            const [newAddon, setNewAddon] = useState({ name: '', notes: '', date: '', price: '' });
+
+            const handleAddAddon = () => {
+                if(!newAddon.name) return;
+                const price = parseFloat(newAddon.price) || 0;
+                setFormData(prev => ({
+                    ...prev,
+                    addons: [...prev.addons, { ...newAddon, price }],
+                    total: (parseFloat(prev.total) || 0) + price
+                }));
+                setNewAddon({ name: '', notes: '', date: '', price: '' });
             };
 
-            const todaysExpenses = expenses.filter(e => new Date(e.date).toDateString() === new Date().toDateString());
-            
-            const inventoryItemsList = useMemo(() => {
-               const prods = (settings.products || []).map(p => typeof p === 'string' ? p : p.name);
-               return ["ورق طباعة صور", "أحبار طابعة", ...prods];
-            }, [settings.products]);
+            const handleRemoveAddon = (index) => {
+                const addon = formData.addons[index];
+                const newAddons = [...formData.addons];
+                newAddons.splice(index, 1);
+                setFormData(prev => ({
+                    ...prev,
+                    addons: newAddons,
+                    total: Math.max(0, (parseFloat(prev.total) || 0) - addon.price)
+                }));
+            };
 
-            return (
-              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                <div className="xl:col-span-2 space-y-6">
-                   <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
-                     <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-100 border-b border-slate-800 pb-4"><i className="ph ph-money text-red-400 text-2xl"></i> تسجيل مصروفات</h2>
-                     <form onSubmit={handleAddExpense} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                       <div>
-                         <label className="block text-sm font-bold text-slate-400 mb-2">المبلغ (ج.م)</label>
-                         <input type="number" required placeholder="المبلغ" value={expData.amount} onChange={e => setExpData({...expData, amount: e.target.value})} className="w-full p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none focus:border-red-500 font-bold" />
-                       </div>
-                       <div>
-                         <label className="block text-sm font-bold text-slate-400 mb-2">بند المصروف</label>
-                         <select value={expData.category} onChange={e => setExpData({...expData, category: e.target.value})} className="w-full p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none focus:border-red-500">
-                           {settings.expenseCategories.map((cat, idx) => <option key={idx} value={cat}>{cat}</option>)}
-                         </select>
-                       </div>
-                       <div>
-                         <label className="block text-sm font-bold text-slate-400 mb-2">ملاحظات</label>
-                         <input type="text" placeholder="اختياري..." value={expData.notes} onChange={e => setExpData({...expData, notes: e.target.value})} className="w-full p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none focus:border-red-500 placeholder-slate-500" />
-                       </div>
-                       <button type="submit" className="sm:col-span-3 w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg shadow-md transition-all flex items-center justify-center gap-2"><i className="ph ph-plus-circle text-xl"></i> إضافة المصروف</button>
-                     </form>
-                   </div>
-                   <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
-                      <h2 className="text-xl font-bold mb-4 flex justify-between text-slate-100 border-b border-slate-800 pb-4">
-                       <span>مصروفات اليوم</span>
-                       <span className="text-red-400 text-sm bg-red-950/40 px-3 py-1 rounded border border-red-900/50">الإجمالي: {formatCurrency(todaysExpenses.reduce((s,e)=>s+e.amount,0))}</span>
-                     </h2>
-                     <div className="space-y-3">
-                       {todaysExpenses.length === 0 ? <p className="text-slate-500 text-center p-6 bg-slate-950 rounded-xl border border-slate-800 border-dashed">لم يتم تسجيل مصروفات اليوم.</p> : todaysExpenses.map(exp => (
-                         <div key={exp.id} className="flex justify-between items-center p-4 bg-slate-950 rounded-xl border border-slate-800">
-                           <div>
-                               <p className="font-bold text-slate-200">{exp.category} <span className="text-red-400 mr-2">{exp.amount} ج.م</span></p>
-                               {exp.notes && <p className="text-xs text-slate-500 mt-1">{exp.notes}</p>}
-                               <p className="text-xs text-slate-600 mt-2 font-mono">{formatDate(exp.date)}</p>
-                           </div>
-                           <button onClick={async () => await deleteDoc(doc(db, `artifacts/studio-marakby/public/data/expenses`, exp.id))} className="text-slate-500 hover:text-red-400 p-2"><i className="ph ph-trash text-xl"></i></button>
-                         </div>
-                       ))}
-                     </div>
-                   </div>
-                </div>
+            const handleSelectPackage = (pkg) => {
+                setFormData(prev => {
+                    const exists = prev.packages.find(p => p.name === pkg.name);
+                    let newPkgs, priceDiff;
+                    if (exists) {
+                        newPkgs = prev.packages.filter(p => p.name !== pkg.name);
+                        priceDiff = -exists.price;
+                    } else {
+                        newPkgs = [...prev.packages, { ...pkg }];
+                        priceDiff = pkg.price;
+                    }
+                    return {
+                        ...prev,
+                        packages: newPkgs,
+                        total: Math.max(0, (parseFloat(prev.total) || 0) + priceDiff)
+                    };
+                });
+            };
 
-                <div className="xl:col-span-1">
-                   <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800 sticky top-24">
-                      <h2 className="text-xl font-bold mb-2 flex items-center gap-2 text-slate-100 border-b border-slate-800 pb-4">
-                          <i className="ph ph-stack text-purple-400 text-2xl"></i> إدارة المخزون
-                      </h2>
-                      <p className="text-xs text-slate-500 mb-5 leading-relaxed bg-slate-950 p-3 rounded-lg border border-slate-800">
-                        يتم خصم البضاعة من المخزون <span className="font-bold text-purple-400">تلقائياً</span> بمجرد بيعها من واجهة الإضافة.
-                      </p>
-                      
-                      <div className="space-y-3 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
-                         {inventoryItemsList.map(item => (
-                            <div key={item} className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center p-3 bg-slate-950 rounded-xl border border-slate-800 gap-3 hover:border-slate-700 transition-colors">
-                               <span className="font-bold text-slate-300 text-sm leading-snug">{item}</span>
-                               <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-700 shadow-sm w-full sm:w-auto justify-center shrink-0">
-                                  <button type="button" onClick={()=>updateInventory(item, -1)} className="text-red-400 hover:bg-slate-800 p-2 rounded-md transition-colors"><i className="ph ph-minus text-sm"></i></button>
-                                  <span className="font-black text-base w-8 text-center text-slate-100">{inventory[item] || 0}</span>
-                                  <button type="button" onClick={()=>updateInventory(item, 1)} className="text-green-400 hover:bg-slate-800 p-2 rounded-md transition-colors"><i className="ph ph-plus text-sm"></i></button>
-                               </div>
-                            </div>
-                         ))}
-                      </div>
-                   </div>
-                </div>
-              </div>
-            );
-          };
+            const handleUpdatePackagePrice = (pkgName, newPrice) => {
+                 setFormData(prev => {
+                     let diff = 0;
+                     const newPkgs = prev.packages.map(p => {
+                         if (p.name === pkgName) {
+                             diff = newPrice - p.price;
+                             return { ...p, price: newPrice };
+                         }
+                         return p;
+                     });
+                     return {
+                         ...prev,
+                         packages: newPkgs,
+                         total: Math.max(0, (parseFloat(prev.total) || 0) + diff)
+                     };
+                 });
+            };
 
-          const ReportsTab = () => {
-            const currentMonth = new Date().getMonth() + 1;
-            const currentYear = new Date().getFullYear();
-            const [filter, setFilter] = useState({ month: currentMonth, year: currentYear });
-            const [payModal, setPayModal] = useState(null);
-            
-            const filteredTxns = transactions.filter(t => t.month == filter.month && t.year == filter.year);
-            const filteredWeds = weddings.filter(t => t.month == filter.month && t.year == filter.year);
-            const filteredExp = expenses.filter(e => e.month == filter.month && e.year == filter.year);
-            
-            const studioStats = useMemo(() => {
-              const expected = filteredTxns.reduce((sum, t) => sum + t.total, 0);
-              const collected = filteredTxns.reduce((sum, t) => sum + t.paid, 0);
-              const electronic = filteredTxns.reduce((sum, t) => sum + (t.electronicPaid || 0), 0);
-              return { expected, collected, cash: collected - electronic, electronic, debts: filteredTxns.reduce((sum, t) => sum + t.remaining, 0) };
-            }, [filteredTxns]);
+            const handleEdit = (txn) => {
+                setFormData({
+                    id: txn.id,
+                    receiptNo: txn.receiptNo,
+                    dateTime: txn.dateTime,
+                    month: txn.month,
+                    year: txn.year,
+                    status: txn.status,
+                    groomName: txn.groomName || '',
+                    brideName: txn.brideName || '',
+                    phone: txn.phone || '',
+                    groomAddress: txn.groomAddress || '',
+                    weddingDate: txn.weddingDate || '',
+                    location: txn.location || '',
+                    makeupArtist: txn.makeupArtist || '',
+                    leaveTime: txn.leaveTime || '',
+                    sessionType: txn.sessionType || '',
+                    casualShootDate: txn.casualShootDate || '',
+                    packages: txn.packages || (txn.package ? [txn.package] : []),
+                    addons: txn.addons || [],
+                    total: txn.total || '',
+                    paid: txn.paid || '',
+                    electronicPaid: txn.electronicPaid || 0,
+                    paymentMethod: txn.electronicPaid > 0 ? 'electronic' : 'cash'
+                });
+                setIsEditing(true);
+                setShowAddModal(true);
+            };
 
-            const wedStats = useMemo(() => {
-              const expected = filteredWeds.reduce((sum, t) => sum + t.total, 0);
-              const collected = filteredWeds.reduce((sum, t) => sum + t.paid, 0);
-              const electronic = filteredWeds.reduce((sum, t) => sum + (t.electronicPaid || 0), 0);
-              return { expected, collected, cash: collected - electronic, electronic, debts: filteredWeds.reduce((sum, t) => sum + t.remaining, 0) };
-            }, [filteredWeds]);
+            const handleSubmit = async (e) => {
+              e.preventDefault();
+              const total = parseFloat(formData.total) || 0;
+              const paid = parseFloat(formData.paid) || 0;
+              const newWedding = {
+                id: isEditing ? formData.id : Date.now().toString(),
+                receiptNo: isEditing ? formData.receiptNo : (settings.nextReceiptNo || 1000),
+                type: 'wedding',
+                dateTime: isEditing ? formData.dateTime : new Date().toISOString(),
+                groomName: formData.groomName,
+                brideName: formData.brideName,
+                phone: formData.phone,
+                groomAddress: formData.groomAddress,
+                weddingDate: formData.weddingDate,
+                location: formData.location,
+                makeupArtist: formData.makeupArtist,
+                leaveTime: formData.leaveTime,
+                sessionType: formData.sessionType,
+                casualShootDate: formData.casualShootDate,
+                packages: formData.packages,
+                addons: formData.addons,
+                total: total,
+                paid: paid,
+                electronicPaid: isEditing ? formData.electronicPaid : (formData.paymentMethod === 'electronic' ? paid : 0),
+                remaining: total - paid,
+                status: isEditing ? formData.status : 0,
+                month: isEditing ? formData.month : new Date().getMonth() + 1,
+                year: isEditing ? formData.year : new Date().getFullYear()
+              };
+              
+              const appId = 'studio-marakby';
+              await setDoc(doc(db, `artifacts/${appId}/public/data/weddings`, newWedding.id), newWedding);
+              
+              if(!isEditing) setSettings({...settings, nextReceiptNo: (settings.nextReceiptNo || 1000) + 1});
+              setFormData({ groomName:'', brideName:'', phone:'', groomAddress:'', weddingDate:'', location:'', makeupArtist:'', leaveTime:'', sessionType:'', casualShootDate:'', packages:[], addons:[], total:'', paid:'', paymentMethod:'cash' });
+              setIsEditing(false);
+              setShowAddModal(false);
+            };
 
-            const expensesTotal = useMemo(() => filteredExp.reduce((sum, e) => sum + e.amount, 0), [filteredExp]);
-            const totalCollectedAll = studioStats.collected + wedStats.collected;
-            const netProfit = totalCollectedAll - expensesTotal;
+            const handleDelete = async (id) => {
+              if(window.confirm('هل أنت متأكد من حذف هذا الحجز؟')) await deleteDoc(doc(db, `artifacts/studio-marakby/public/data/weddings`, id));
+            };
+
+            const updateTxnStatus = async (txnId, newStatus) => {
+                const txnToUpdate = weddings.find(t => t.id === txnId);
+                if(txnToUpdate) {
+                    const updated = {...txnToUpdate, status: newStatus};
+                    await setDoc(doc(db, `artifacts/studio-marakby/public/data/weddings`, updated.id), updated);
+                }
+            };
+
+            const filteredWeds = query ? weddings.filter(t => t.groomName.includes(query) || t.brideName.includes(query) || t.phone.includes(query) || t.receiptNo.toString().includes(query)) : weddings;
 
             return (
               <div className="space-y-6">
-                <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800 flex flex-wrap gap-4 items-end justify-between">
-                  <h2 className="text-xl font-bold flex items-center gap-2 text-slate-100"><i className="ph ph-calendar-blank text-blue-400 text-2xl"></i> تقارير شهرية شاملة ومفصلة</h2>
-                  <div className="flex gap-2">
-                    <select value={filter.month} onChange={e => setFilter({...filter, month: e.target.value})} className="p-2 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none">{Array.from({length: 12}, (_, i) => i + 1).map(m => <option key={m} value={m}>شهر {m}</option>)}</select>
-                    <select value={filter.year} onChange={e => setFilter({...filter, year: e.target.value})} className="p-2 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none">{[currentYear-1, currentYear, currentYear+1].map(y => <option key={y} value={y}>{y}</option>)}</select>
+                <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800 flex flex-col md:flex-row gap-4 items-center justify-between">
+                  <button onClick={() => { setIsEditing(false); setFormData({ groomName:'', brideName:'', phone:'', groomAddress:'', weddingDate:'', location:'', makeupArtist:'', leaveTime:'', sessionType:'', casualShootDate:'', packages:[], addons:[], total:'', paid:'', paymentMethod:'cash' }); setShowAddModal(true); }} className="w-full md:w-auto bg-pink-600 hover:bg-pink-500 text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-pink-900/50">
+                    <i className="ph ph-heart text-2xl"></i> حجز زفاف جديد
+                  </button>
+                  <div className="relative w-full md:w-1/2">
+                    <i className="ph ph-magnifying-glass absolute right-4 top-4 text-slate-500 text-xl"></i>
+                    <input type="text" placeholder="ابحث باسم العريس، العروسة، رقم الهاتف..." className="w-full p-3 pr-10 border border-slate-700 bg-slate-950 text-white placeholder-slate-500 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none text-sm transition-colors" value={query} onChange={(e) => setQuery(e.target.value)} />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <StatCard title="التحصيل العام (استوديو + زفاف)" value={totalCollectedAll} color="blue" highlight />
-                  <StatCard title="إجمالي المصروفات" value={expensesTotal} color="red" highlight />
-                  <StatCard title="صافي الربح الفعلي" value={netProfit} color={netProfit >= 0 ? "emerald" : "rose"} highlight />
+                <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
+                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-100 border-b border-slate-800 pb-4">
+                    <i className="ph ph-calendar-heart text-pink-400 text-2xl"></i> حجوزات الزفاف ({filteredWeds.length})
+                  </h2>
+                  <div className="space-y-4">
+                    {filteredWeds.length === 0 ? <p className="text-center p-10 text-slate-500">لا توجد حجوزات مسجلة.</p> : filteredWeds.map(txn => <TransactionCard key={txn.id} txn={txn} onDelete={handleDelete} onEdit={handleEdit} onPayRemaining={setPayModal} onViewReceipt={setReceiptImageModal} sendInvoice={() => openWhatsApp(txn.phone, generateWA_Message('invoice', txn, true))} updateStatus={updateTxnStatus} onViewDetails={setTxnDetailsModal} />)}
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* تقرير الاستوديو */}
-                  <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800 flex flex-col">
-                    <h3 className="text-lg font-bold text-blue-400 mb-4 border-b border-slate-800 pb-2 flex items-center gap-2"><i className="ph ph-camera text-xl"></i> تقرير الاستوديو (تصوير عادي)</h3>
-                    <div className="grid grid-cols-2 gap-3 mb-6">
-                      <StatCard title="إجمالي الشغل" value={studioStats.expected} color="blue" />
-                      <StatCard title="التحصيل الفعلي" value={studioStats.collected} color="green" />
-                      <StatCard title="محصل نقدي" value={studioStats.cash} color="green" />
-                      <StatCard title="محصل إلكتروني" value={studioStats.electronic} color="indigo" />
-                    </div>
-                    
-                    <div className="mt-auto">
-                        <h4 className="font-bold text-red-400 mb-3 flex items-center justify-between bg-red-950/20 p-3 rounded-lg border border-red-900/30">
-                            <span>ديون الاستوديو المتأخرة</span>
-                            <span className="text-sm font-black">{formatCurrency(studioStats.debts)}</span>
-                        </h4>
-                        <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-2">
-                          {filteredTxns.filter(t => t.remaining > 0).map(txn => (
-                            <div key={txn.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-slate-950 rounded-xl border border-slate-800 gap-2">
-                              <div>
-                                  <span className="font-bold text-slate-200 text-sm">{txn.clientName}</span>
-                                  <div className="text-xs text-slate-500 mt-1 font-mono">📞 {txn.phone} | #{txn.receiptNo}</div>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-red-400 font-bold text-xs ml-2">{txn.remaining} ج.م</span>
-                                <button onClick={() => openWhatsApp(txn.phone, `مرحباً أ. ${txn.clientName} 🌟\nتذكير بمبلغ متبقي لحسابكم في ${settings.studioName} بقيمة ${txn.remaining} ج.م.\nيمكن التحويل فودافون كاش أو إنستاباي على رقم: 01201260040`)} className="bg-green-600 hover:bg-green-500 text-white p-2 rounded-lg text-xs transition-colors" title="إرسال تذكير عبر الواتس"><i className="ph ph-whatsapp-logo text-base"></i></button>
-                                <button onClick={() => setPayModal({...txn, paymentType: 'cash'})} className="bg-yellow-500 hover:bg-yellow-400 text-slate-900 p-2 rounded-lg text-xs transition-colors" title="سداد نقدي"><i className="ph ph-money text-base"></i></button>
-                                <button onClick={() => setPayModal({...txn, paymentType: 'electronic'})} className="bg-indigo-500 hover:bg-indigo-400 text-white p-2 rounded-lg text-xs transition-colors" title="سداد إلكتروني"><i className="ph ph-wallet text-base"></i></button>
-                              </div>
-                            </div>
-                          ))}
-                          {filteredTxns.filter(t => t.remaining > 0).length === 0 && <p className="text-slate-500 text-xs text-center py-4 bg-slate-950 rounded-xl border border-slate-800 border-dashed">لا توجد ديون للاستوديو مسجلة.</p>}
+                {showAddModal && (
+                  <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-slate-900 p-6 rounded-3xl shadow-2xl border border-slate-800 w-full max-w-5xl relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+                      <button onClick={() => setShowAddModal(false)} className="absolute top-4 left-4 p-2 text-slate-500 hover:text-pink-400"><i className="ph ph-x text-xl"></i></button>
+                      <h2 className="text-xl font-black mb-6 text-slate-100 border-b border-slate-800 pb-3 flex items-center gap-2"><i className="ph ph-heart text-pink-500"></i> {isEditing ? 'تعديل حجز الزفاف' : 'تفاصيل حجز زفاف جديد'}</h2>
+                      <form onSubmit={handleSubmit} className="space-y-5">
+                        
+                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                           <h4 className="text-sm font-bold text-pink-400 mb-3 border-b border-slate-800 pb-2">بيانات العرسان الأساسية</h4>
+                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                              <input type="text" placeholder="اسم العريس (اختياري)" className="w-full p-3 border border-slate-700 bg-slate-900 text-white rounded-lg outline-none focus:border-pink-500 text-sm" value={formData.groomName} onChange={e => setFormData({...formData, groomName: e.target.value})} />
+                              <input type="text" placeholder="اسم العروسة (اختياري)" className="w-full p-3 border border-slate-700 bg-slate-900 text-white rounded-lg outline-none focus:border-pink-500 text-sm" value={formData.brideName} onChange={e => setFormData({...formData, brideName: e.target.value})} />
+                           </div>
+                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <input type="tel" placeholder="رقم الهاتف (واتساب للتواصل)" className="w-full p-3 border border-slate-700 bg-slate-900 text-white rounded-lg outline-none focus:border-pink-500 text-sm" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                              <input type="text" placeholder="عنوان العريس (اختياري)" className="w-full p-3 border border-slate-700 bg-slate-900 text-white rounded-lg outline-none focus:border-pink-500 text-sm" value={formData.groomAddress} onChange={e => setFormData({...formData, groomAddress: e.target.value})} />
+                           </div>
                         </div>
-                    </div>
-                  </div>
 
-                  {/* تقرير الزفاف */}
-                  <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800 flex flex-col">
-                    <h3 className="text-lg font-bold text-pink-400 mb-4 border-b border-slate-800 pb-2 flex items-center gap-2"><i className="ph ph-heart text-xl"></i> تقرير حجوزات الزفاف</h3>
-                    <div className="grid grid-cols-2 gap-3 mb-6">
-                      <StatCard title="إجمالي الحجوزات" value={wedStats.expected} color="blue" />
-                      <StatCard title="العربون المحصل" value={wedStats.collected} color="green" />
-                      <StatCard title="محصل نقدي" value={wedStats.cash} color="green" />
-                      <StatCard title="محصل إلكتروني" value={wedStats.electronic} color="indigo" />
-                    </div>
-                    
-                    <div className="mt-auto">
-                        <h4 className="font-bold text-red-400 mb-3 flex items-center justify-between bg-red-950/20 p-3 rounded-lg border border-red-900/30">
-                            <span>بواقي الزفاف المتأخرة</span>
-                            <span className="text-sm font-black">{formatCurrency(wedStats.debts)}</span>
-                        </h4>
-                        <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-2">
-                          {filteredWeds.filter(t => t.remaining > 0).map(txn => (
-                            <div key={txn.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-slate-950 rounded-xl border border-slate-800 gap-2">
+                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                           <h4 className="text-sm font-bold text-pink-400 mb-3 border-b border-slate-800 pb-2">تفاصيل ومواعيد الزفاف</h4>
+                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                               <div>
-                                  <span className="font-bold text-pink-300 text-sm">{txn.groomName} و {txn.brideName}</span>
-                                  <div className="text-xs text-slate-500 mt-1 font-mono">📞 {txn.phone} | #{txn.receiptNo}</div>
+                                 <label className="text-xs text-slate-500 mb-1 block">موعد الزفاف (اختياري)</label>
+                                 <input type="date" className="w-full p-3 border border-slate-700 bg-slate-900 text-white rounded-lg outline-none focus:border-pink-500 text-sm" value={formData.weddingDate} onChange={e => setFormData({...formData, weddingDate: e.target.value})} />
                               </div>
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-red-400 font-bold text-xs ml-2">{txn.remaining} ج.م</span>
-                                <button onClick={() => openWhatsApp(txn.phone, `مرحباً العريس ${txn.groomName} 🌟\nتذكير بمبلغ متبقي لحجز الزفاف في ${settings.studioName} بقيمة ${txn.remaining} ج.م.\nيمكن التحويل فودافون كاش أو إنستاباي على رقم: 01201260040`)} className="bg-green-600 hover:bg-green-500 text-white p-2 rounded-lg text-xs transition-colors" title="إرسال تذكير عبر الواتس"><i className="ph ph-whatsapp-logo text-base"></i></button>
-                                <button onClick={() => setPayModal({...txn, paymentType: 'cash'})} className="bg-yellow-500 hover:bg-yellow-400 text-slate-900 p-2 rounded-lg text-xs transition-colors" title="سداد نقدي"><i className="ph ph-money text-base"></i></button>
-                                <button onClick={() => setPayModal({...txn, paymentType: 'electronic'})} className="bg-indigo-500 hover:bg-indigo-400 text-white p-2 rounded-lg text-xs transition-colors" title="سداد إلكتروني"><i className="ph ph-wallet text-base"></i></button>
+                              <div>
+                                 <label className="text-xs text-slate-500 mb-1 block">مكان التصوير (اللوكيشن / القاعة)</label>
+                                 <input type="text" placeholder="اسم اللوكيشن..." className="w-full p-3 border border-slate-700 bg-slate-900 text-white rounded-lg outline-none focus:border-pink-500 text-sm" value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} />
                               </div>
-                            </div>
-                          ))}
-                          {filteredWeds.filter(t => t.remaining > 0).length === 0 && <p className="text-slate-500 text-xs text-center py-4 bg-slate-950 rounded-xl border border-slate-800 border-dashed">لا توجد بواقي زفاف مستحقة.</p>}
+                           </div>
+                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                              <div>
+                                 <label className="text-xs text-slate-500 mb-1 block">اسم خبيرة التجميل (الميك أب)</label>
+                                 <input type="text" placeholder="الميك أب..." className="w-full p-3 border border-slate-700 bg-slate-900 text-white rounded-lg outline-none focus:border-pink-500 text-sm" value={formData.makeupArtist} onChange={e => setFormData({...formData, makeupArtist: e.target.value})} />
+                              </div>
+                              <div>
+                                 <label className="text-xs text-slate-500 mb-1 block">وقت الخروج المتوقع</label>
+                                 <input type="time" className="w-full p-3 border border-slate-700 bg-slate-900 text-white rounded-lg outline-none focus:border-pink-500 text-sm" value={formData.leaveTime} onChange={e => setFormData({...formData, leaveTime: e.target.value})} />
+                              </div>
+                              <div>
+                                 <label className="text-xs text-slate-500 mb-1 block">نوع السيشن</label>
+                                 <input type="text" placeholder="مثال: فري ستايل، كلاسيك..." className="w-full p-3 border border-slate-700 bg-slate-900 text-white rounded-lg outline-none focus:border-pink-500 text-sm" value={formData.sessionType} onChange={e => setFormData({...formData, sessionType: e.target.value})} />
+                              </div>
+                           </div>
+                           <div>
+                              <label className="text-xs text-slate-500 mb-1 block">تاريخ تصوير الكاجوال (إن وجد)</label>
+                              <input type="date" className="w-full p-3 border border-slate-700 bg-slate-900 text-white rounded-lg outline-none focus:border-pink-500 text-sm" value={formData.casualShootDate} onChange={e => setFormData({...formData, casualShootDate: e.target.value})} />
+                           </div>
                         </div>
+
+                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                           <h4 className="text-sm font-bold text-pink-400 mb-3 border-b border-slate-800 pb-2">اختيار الباقات الأساسية (يمكنك اختيار أكثر من باقة)</h4>
+                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                              {settings.weddingPackages.map((pkg, idx) => {
+                                 const isSelected = formData.packages.some(p => p.name === pkg.name);
+                                 return (
+                                     <div key={idx} onClick={() => handleSelectPackage(pkg)} className={`p-3 rounded-xl border cursor-pointer transition-all ${isSelected ? 'bg-pink-900/30 border-pink-500' : 'bg-slate-900 border-slate-700 hover:border-pink-500/50'}`}>
+                                        <div className="font-bold text-sm text-slate-200 mb-1">{pkg.name}</div>
+                                        <div className="text-xs text-slate-500 mb-2 h-8 overflow-hidden">{pkg.desc}</div>
+                                        <div className="font-black text-pink-400 text-sm">{pkg.price} ج.م</div>
+                                     </div>
+                                 );
+                              })}
+                           </div>
+                           {formData.packages.length > 0 && (
+                               <div className="mt-4 space-y-2">
+                                   {formData.packages.map((pkg, i) => (
+                                       <div key={i} className="p-3 bg-slate-900 rounded-lg border border-slate-700 flex justify-between items-center">
+                                          <span className="text-sm font-bold text-slate-300">الباقة المختارة: {pkg.name}</span>
+                                          <div className="flex items-center bg-slate-950 rounded-md border border-slate-700 px-2 py-1">
+                                             <span className="text-xs text-slate-500 ml-2">تعديل السعر:</span>
+                                             <input type="number" value={pkg.price} onChange={e => handleUpdatePackagePrice(pkg.name, parseFloat(e.target.value) || 0)} className="w-16 bg-transparent text-white text-center outline-none text-sm font-bold" />
+                                          </div>
+                                       </div>
+                                   ))}
+                               </div>
+                           )}
+                        </div>
+
+                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                           <h4 className="text-sm font-bold text-pink-400 mb-3 border-b border-slate-800 pb-2">صندوق إضافات أخرى (مثال: تصوير حنة)</h4>
+                           <div className="flex flex-col gap-2 mb-3">
+                              <div className="flex flex-col sm:flex-row gap-2">
+                                  <input type="text" placeholder="اسم الإضافة (حنة، كتب كتاب...)" value={newAddon.name} onChange={e=>setNewAddon({...newAddon, name: e.target.value})} className="flex-1 p-2.5 border border-slate-700 bg-slate-900 text-white rounded-lg outline-none focus:border-pink-500 text-sm" />
+                                  <input type="date" value={newAddon.date} onChange={e=>setNewAddon({...newAddon, date: e.target.value})} className="w-full sm:w-36 p-2.5 border border-slate-700 bg-slate-900 text-slate-400 rounded-lg outline-none focus:border-pink-500 text-sm" />
+                              </div>
+                              <div className="flex flex-col sm:flex-row gap-2">
+                                  <input type="text" placeholder="ملاحظات وتفاصيل الإضافة (اختياري)..." value={newAddon.notes} onChange={e=>setNewAddon({...newAddon, notes: e.target.value})} className="flex-1 p-2.5 border border-slate-700 bg-slate-900 text-white rounded-lg outline-none focus:border-pink-500 text-sm" />
+                                  <input type="number" placeholder="السعر" value={newAddon.price} onChange={e=>setNewAddon({...newAddon, price: e.target.value})} className="w-full sm:w-28 p-2.5 border border-slate-700 bg-slate-900 text-white rounded-lg outline-none focus:border-pink-500 text-sm" />
+                                  <button type="button" onClick={handleAddAddon} className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2.5 rounded-lg transition-colors"><i className="ph ph-plus font-bold"></i></button>
+                              </div>
+                           </div>
+                           <div className="space-y-2">
+                              {formData.addons.map((addon, idx) => (
+                                 <div key={idx} className="flex justify-between items-center bg-slate-900 p-2.5 rounded-lg border border-slate-700">
+                                    <div className="flex flex-col gap-1">
+                                        <div className="flex items-center gap-3 text-sm">
+                                            <span className="font-bold text-slate-200">{addon.name}</span>
+                                            {addon.date && <span className="text-xs text-slate-500">({formatDateOnly(addon.date)})</span>}
+                                        </div>
+                                        {addon.notes && <span className="text-xs text-slate-400">{addon.notes}</span>}
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className="font-bold text-pink-400 text-sm">{addon.price} ج.م</span>
+                                        <button type="button" onClick={()=>handleRemoveAddon(idx)} className="text-red-400 hover:text-red-300"><i className="ph ph-x"></i></button>
+                                    </div>
+                                 </div>
+                              ))}
+                           </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          <input type="number" placeholder="الإجمالي" className="p-3 border border-slate-700 bg-slate-950 text-white rounded-xl outline-none focus:border-pink-500 text-sm font-bold" value={formData.total} onChange={e => setFormData({...formData, total: e.target.value})} />
+                          <input type="number" placeholder="المدفوع الان" className="p-3 border border-slate-700 bg-slate-950 text-white rounded-xl outline-none focus:border-green-500 text-sm font-bold" value={formData.paid} onChange={e => setFormData({...formData, paid: e.target.value})} />
+                          {!isEditing && (
+                              <select className="p-3 border border-slate-700 bg-slate-950 text-white rounded-xl outline-none focus:border-indigo-500 col-span-2 md:col-span-1 text-sm font-bold" value={formData.paymentMethod} onChange={e => setFormData({...formData, paymentMethod: e.target.value})}>
+                                 <option value="cash">دفع نقدي</option>
+                                 <option value="electronic">دفع إلكتروني (محافظ)</option>
+                              </select>
+                          )}
+                        </div>
+                        <div className={`p-3 rounded-xl text-center font-black text-lg border ${(parseFloat(formData.total)||0 - parseFloat(formData.paid)||0) > 0 ? 'bg-red-950/40 text-red-400 border-red-900/50' : 'bg-green-950/40 text-green-400 border-green-900/50'}`}>
+                          الباقي: {formatCurrency((parseFloat(formData.total) || 0) - (parseFloat(formData.paid) || 0))}
+                        </div>
+                        <button type="submit" className="w-full bg-pink-600 text-white hover:bg-pink-500 font-black py-3 rounded-xl shadow-lg text-sm"><i className="ph ph-check-circle text-lg ml-2 align-middle"></i>حفظ بيانات الزفاف</button>
+                      </form>
                     </div>
                   </div>
-                </div>
+                )}
 
+                {/* Modals for Details and Payment... reused logic */}
                 {payModal && (
-                   <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-slate-900 p-6 rounded-3xl shadow-xl border border-slate-800 w-full max-w-md relative">
-                      <button onClick={() => setPayModal(null)} className="absolute top-4 left-4 p-2 text-slate-500 hover:text-red-400"><i className="ph ph-x text-2xl"></i></button>
-                      <h3 className="text-2xl font-black mb-4 border-b border-slate-800 pb-4 text-center text-slate-100">
+                  <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-slate-900 p-5 rounded-2xl shadow-xl border border-slate-800 w-full max-w-sm relative">
+                      <button onClick={() => setPayModal(null)} className="absolute top-3 left-3 p-2 text-slate-500 hover:text-red-400"><i className="ph ph-x text-xl"></i></button>
+                      <h3 className="text-xl font-black mb-3 border-b border-slate-800 pb-3 text-center text-slate-100">
                           {payModal.paymentType === 'electronic' ? 'سداد إلكتروني (إنستاباي/محافظ)' : 'سداد نقدي'}
                       </h3>
-                      <div className="mb-6 bg-slate-950 p-4 rounded-xl text-center border border-slate-800">
-                        <p className="text-slate-300">العميل: <b className="text-white text-lg">{payModal.type === 'wedding' ? payModal.groomName : payModal.clientName}</b></p>
-                        <p className="text-red-400 font-bold mt-2">الباقي المستحق: {payModal.remaining} ج.م</p>
+                      <div className="mb-4 bg-slate-950 p-3 rounded-xl text-center border border-slate-800">
+                        <p className="text-slate-400 text-sm">العميل: <b className="text-white text-base">{payModal.type === 'wedding' ? payModal.groomName : payModal.clientName}</b></p>
+                        <p className="text-red-400 font-bold mt-1 text-sm">الباقي المستحق: {payModal.remaining} ج.م</p>
                       </div>
                       <form onSubmit={async (e) => {
                         e.preventDefault();
@@ -1254,10 +1373,96 @@
                         const targetCol = updated.type === 'wedding' ? 'weddings' : 'transactions';
                         await setDoc(doc(db, `artifacts/studio-marakby/public/data/${targetCol}`, updated.id), updated);
                         setPayModal(null);
-                      }} className="space-y-4">
-                        <input type="number" name="amount" required min="1" max={payModal.remaining} defaultValue={payModal.remaining} className="w-full p-4 border border-slate-700 bg-slate-950 text-white rounded-xl text-2xl font-black text-center outline-none focus:border-blue-500 shadow-inner"/>
-                        <button type="submit" className={`w-full text-white font-black py-4 rounded-xl shadow-lg transition-all text-lg ${payModal.paymentType === 'electronic' ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/20' : 'bg-green-600 hover:bg-green-500 shadow-green-900/20'}`}>تأكيد تحصيل المبلغ</button>
+                      }} className="space-y-3">
+                        <input type="number" name="amount" required min="1" max={payModal.remaining} defaultValue={payModal.remaining} className="w-full p-3 border border-slate-700 bg-slate-950 text-white rounded-xl text-xl font-black text-center outline-none focus:border-blue-500 shadow-inner"/>
+                        <button type="submit" className={`w-full text-white font-black py-3 rounded-xl shadow-lg transition-all text-base ${payModal.paymentType === 'electronic' ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/20' : 'bg-green-600 hover:bg-green-500 shadow-green-900/20'}`}>تأكيد تحصيل المبلغ</button>
                       </form>
+                    </div>
+                  </div>
+                )}
+                
+                {receiptImageModal && (
+                  <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+                    <div className="relative max-w-2xl w-full flex flex-col items-center">
+                      <button onClick={() => setReceiptImageModal(null)} className="absolute -top-14 right-0 p-2 text-white hover:text-red-400 bg-slate-800 rounded-full shadow-lg border border-slate-700 transition-colors"><i className="ph ph-x text-2xl"></i></button>
+                      <img src={receiptImageModal} alt="إيصال تحويل" className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl border border-slate-700 object-contain bg-slate-900" />
+                    </div>
+                  </div>
+                )}
+
+                {txnDetailsModal && (
+                  <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setTxnDetailsModal(null)}>
+                    <div className="bg-slate-900 p-6 rounded-3xl shadow-xl border border-slate-800 w-full max-w-lg relative max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => setTxnDetailsModal(null)} className="absolute top-4 left-4 p-2 text-slate-500 hover:text-red-400 transition-colors"><i className="ph ph-x text-2xl"></i></button>
+                      
+                      <h3 className="text-2xl font-black mb-6 border-b border-slate-800 pb-4 text-slate-100 flex items-center gap-2">
+                        {txnDetailsModal.type === 'wedding' ? <i className="ph ph-heart text-pink-500"></i> : <i className="ph ph-files text-blue-500"></i>}
+                        تفاصيل {txnDetailsModal.type === 'wedding' ? 'حجز زفاف' : 'الإيصال'} #{txnDetailsModal.receiptNo}
+                      </h3>
+
+                      <div className="space-y-5">
+                        <div className="flex justify-between items-center bg-slate-950 p-4 rounded-xl border border-slate-800">
+                           <div>
+                              <p className="text-slate-500 text-xs mb-1">الاسم</p>
+                              <p className="font-bold text-lg text-slate-100">
+                                {txnDetailsModal.type === 'wedding' ? `${txnDetailsModal.groomName} و ${txnDetailsModal.brideName}` : txnDetailsModal.clientName}
+                              </p>
+                           </div>
+                           <div className="text-left">
+                              <p className="text-slate-500 text-xs mb-1">رقم الهاتف</p>
+                              <p className="font-mono text-slate-300">{txnDetailsModal.phone}</p>
+                           </div>
+                        </div>
+
+                        {txnDetailsModal.type === 'wedding' && (
+                            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 grid grid-cols-2 gap-4">
+                                <div><p className="text-slate-500 text-xs mb-1">موعد الزفاف</p><p className="font-bold text-slate-200">{formatDateOnly(txnDetailsModal.weddingDate)}</p></div>
+                                <div><p className="text-slate-500 text-xs mb-1">اللوكيشن</p><p className="font-bold text-slate-200">{txnDetailsModal.location}</p></div>
+                                <div><p className="text-slate-500 text-xs mb-1">الميك أب</p><p className="font-bold text-slate-200">{txnDetailsModal.makeupArtist}</p></div>
+                                <div><p className="text-slate-500 text-xs mb-1">وقت الخروج</p><p className="font-bold text-slate-200">{txnDetailsModal.leaveTime}</p></div>
+                                <div className="col-span-2 border-t border-slate-800 pt-3 mt-1"><p className="text-slate-500 text-xs mb-1">العنوان</p><p className="font-bold text-slate-200">{txnDetailsModal.groomAddress}</p></div>
+                            </div>
+                        )}
+
+                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                           <p className="text-slate-500 text-xs mb-2">المطلوب (الخدمات والمنتجات)</p>
+                           <p className="text-slate-200 leading-relaxed font-medium whitespace-pre-wrap">
+                               {txnDetailsModal.type === 'wedding' 
+                                   ? `الباقات: ${txnDetailsModal.packages?.length > 0 ? txnDetailsModal.packages.map(p=>p.name).join(' + ') : (txnDetailsModal.package ? txnDetailsModal.package.name : 'بدون')}\nالسيشن: ${txnDetailsModal.sessionType}\nالكاجوال: ${txnDetailsModal.casualShootDate ? formatDateOnly(txnDetailsModal.casualShootDate) : 'بدون'}\nإضافات: ${txnDetailsModal.addons?.length > 0 ? txnDetailsModal.addons.map(a=>`${a.name}${a.notes ? ' ('+a.notes+')' : ''}`).join(' + ') : 'بدون'}`
+                                   : txnDetailsModal.requirements}
+                           </p>
+                        </div>
+
+                        {txnDetailsModal.photoNo && (
+                            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex justify-between items-center">
+                               <span className="text-slate-500 text-sm">رقم الصورة:</span>
+                               <span className="font-bold text-slate-200">{txnDetailsModal.photoNo}</span>
+                            </div>
+                        )}
+
+                        <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 grid grid-cols-2 gap-4 relative overflow-hidden">
+                           <div className={`absolute top-0 right-0 w-1 h-full ${txnDetailsModal.type === 'wedding' ? 'bg-pink-500' : 'bg-blue-500'}`}></div>
+                           <div><p className="text-slate-500 text-xs mb-1">الإجمالي</p><p className="font-bold text-slate-100">{txnDetailsModal.total} ج.م</p></div>
+                           <div><p className="text-slate-500 text-xs mb-1">إجمالي المدفوع</p><p className="font-bold text-green-400">{txnDetailsModal.paid} ج.م</p></div>
+                           <div><p className="text-slate-500 text-xs mb-1">الدفع النقدي</p><p className="font-bold text-emerald-400">{(txnDetailsModal.paid || 0) - (txnDetailsModal.electronicPaid || 0)} ج.م</p></div>
+                           <div><p className="text-slate-500 text-xs mb-1">الدفع الإلكتروني</p><p className="font-bold text-indigo-400">{txnDetailsModal.electronicPaid || 0} ج.م</p></div>
+                           <div className="col-span-2 pt-4 mt-2 border-t border-slate-800 flex justify-between items-center">
+                              <span className="text-slate-400 text-sm">الباقي المستحق:</span>
+                              <span className={`font-black text-xl ${txnDetailsModal.remaining > 0 ? 'text-red-400' : 'text-green-400'}`}>{txnDetailsModal.remaining} ج.م</span>
+                           </div>
+                        </div>
+
+                        {txnDetailsModal.pendingReceipt && (
+                            <div className="bg-indigo-950/20 p-4 rounded-xl border border-indigo-500/30">
+                               <p className="text-indigo-300 text-sm font-bold mb-3 flex items-center gap-2">
+                                   <i className="ph ph-image text-lg"></i> صورة التحويل الإلكتروني المرفقة
+                               </p>
+                               <img src={txnDetailsModal.pendingReceipt} alt="Receipt" className="w-full rounded-lg border border-indigo-500/50 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setReceiptImageModal(txnDetailsModal.pendingReceipt)} />
+                            </div>
+                        )}
+                        
+                        <div className="text-xs text-slate-500 text-center mt-4">تاريخ التسجيل: {formatDate(txnDetailsModal.dateTime)}</div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1275,9 +1480,9 @@
                 rose: "bg-rose-600 text-white border-rose-500" 
             };
             return (
-              <div className={`p-5 rounded-2xl border ${colors[color]} ${highlight ? 'shadow-lg scale-105' : ''}`}>
-                <h4 className="text-xs opacity-80 mb-2">{title}</h4>
-                <div className="text-xl sm:text-2xl font-black">{formatCurrency(value)}</div>
+              <div className={`p-3 sm:p-4 rounded-xl border ${colors[color]} ${highlight ? 'shadow-lg scale-105' : ''}`}>
+                <h4 className="text-[11px] sm:text-xs opacity-80 mb-1">{title}</h4>
+                <div className="text-base sm:text-lg font-black">{formatCurrency(value)}</div>
               </div>
             );
           };
