@@ -876,7 +876,8 @@
               setFormData(prev => {
                  const newProductsList = [...(prev.soldProducts || [])];
                  newProductsList.push({ name: srv.name, qty: validQty });
-                 return { ...prev, requirements: prev.requirements ? `${prev.requirements} + ${addedText}` : addedText, total: (parseFloat(prev.total) || 0) + addedPrice, soldProducts: newProductsList };
+                 const newReqs = prev.requirements ? `${prev.requirements}\n📌 ${addedText}` : `📌 ${addedText}`;
+                 return { ...prev, requirements: newReqs, total: (parseFloat(prev.total) || 0) + addedPrice, soldProducts: newProductsList };
               });
             };
 
@@ -1976,6 +1977,18 @@
                               <h2 className="text-xl font-bold text-pink-300 mb-2">شكراً لاختياركم {settings.studioName}</h2>
                               <p className="text-sm text-pink-200/80 leading-relaxed font-medium">
                                   يسعدنا ونتشرف بأن نكون جزءاً من أجمل لحظات حياتكم. نسعى دائماً لتوثيق ذكرياتكم بأفضل جودة وحب لتدوم للأبد. ألف مبروك للعروسين! 🎉💍
+                              </p>
+                          </div>
+                      )}
+
+                      {!isWedding && (
+                          <div className="w-full max-w-md bg-gradient-to-br from-blue-950/40 to-slate-900 p-6 rounded-3xl border border-blue-500/20 mb-8 text-center shadow-lg">
+                              <div className="w-16 h-16 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-500/30">
+                                  <i className="ph-fill ph-camera text-3xl"></i>
+                              </div>
+                              <h2 className="text-xl font-bold text-blue-300 mb-2">شكراً لاختياركم {settings.studioName}</h2>
+                              <p className="text-sm text-blue-200/80 leading-relaxed font-medium">
+                                  نسعد دائماً بزيارتكم وثقتكم بنا لتوثيق ذكرياتكم الجميلة. نعمل بكل حب واحترافية لتقديم أفضل جودة تليق بكم. 🌟📸
                               </p>
                           </div>
                       )}
