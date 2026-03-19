@@ -1781,7 +1781,7 @@
                                       const targetCol = isWedding ? 'weddings' : 'transactions';
                                       await setDoc(doc(db, `artifacts/${appId}/public/data/${targetCol}`, txn.id), updated);
                                       const confirmMsg = `مرحباً، قمت بتحويل مبلغ ${txn.remaining} ج.م لسداد باقي حساب إيصال رقم #${txn.receiptNo} باسم ${displayName}.\n✅ وقمت برفع صورة التحويل في رابط التتبع لتأكيد الدفع.`;
-                                      openWhatsApp('0120126640', confirmMsg);
+                                      openWhatsApp('01201260040', confirmMsg);
                                   } catch (err) { setClientViewError('حدث خطأ أثناء الحفظ، يرجى المحاولة مرة أخرى.'); }
                                   setIsUploading(false);
                               }} disabled={isUploading} className={`w-full font-bold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 ${isUploading || !transferReceipt ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500 text-white shadow-green-900/20'}`}>
