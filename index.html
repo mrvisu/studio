@@ -2201,8 +2201,6 @@
                                               const updatedTxn = { ...txn, clientRating: rating, clientFeedback: feedbackText };
                                               await setDoc(doc(db, `artifacts/${appId}/public/data/${targetCol}`, txn.id), updatedTxn);
                                               
-                                              const msg = `مرحباً، أنا ${displayName} (إيصال #${txn.receiptNo}).\nهذا تقييمي:\nالنجوم: ${rating}/5\nالملاحظات: "${feedbackText || 'لا يوجد'}"`;
-                                              window.open(`https://wa.me/201201260040?text=${encodeURIComponent(msg)}`, '_blank');
                                               setFeedbackSubmitted(true);
                                           } catch(err) {
                                               console.error("Error saving feedback:", err);
