@@ -83,6 +83,16 @@
           { id: 3, label: 'تم التسليم', icon: 'ph-package', activeClass: 'bg-purple-900/40 text-purple-400 border-purple-500/50 shadow-lg shadow-purple-900/20', inactiveClass: 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800', clientIconCompleted: 'bg-purple-500 text-white shadow-lg shadow-purple-500/40 border-purple-900', clientCardCurrent: 'bg-purple-900/20 border-purple-500/50 shadow-lg shadow-purple-900/20', clientTextCurrent: 'text-purple-400' }
         ];
 
+        const WEDDING_STATUSES = [
+          { id: 0, label: 'تأكيد الحجز', icon: 'ph-calendar-check', activeClass: 'bg-blue-900/40 text-blue-400 border-blue-500/50 shadow-lg shadow-blue-900/20', inactiveClass: 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800', clientIconCompleted: 'bg-blue-500 text-white shadow-lg shadow-blue-500/40 border-blue-900', clientCardCurrent: 'bg-blue-900/20 border-blue-500/50 shadow-lg shadow-blue-900/20', clientTextCurrent: 'text-blue-400' },
+          { id: 1, label: 'تصوير الكاجوال', icon: 'ph-camera', activeClass: 'bg-teal-900/40 text-teal-400 border-teal-500/50 shadow-lg shadow-teal-900/20', inactiveClass: 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800', clientIconCompleted: 'bg-teal-500 text-white shadow-lg shadow-teal-500/40 border-teal-900', clientCardCurrent: 'bg-teal-900/20 border-teal-500/50 shadow-lg shadow-teal-900/20', clientTextCurrent: 'text-teal-400' },
+          { id: 2, label: 'تصوير الحنة', icon: 'ph-sparkle', activeClass: 'bg-yellow-900/40 text-yellow-400 border-yellow-500/50 shadow-lg shadow-yellow-900/20', inactiveClass: 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800', clientIconCompleted: 'bg-yellow-500 text-white shadow-lg shadow-yellow-500/40 border-yellow-900', clientCardCurrent: 'bg-yellow-900/20 border-yellow-500/50 shadow-lg shadow-yellow-900/20', clientTextCurrent: 'text-yellow-400' },
+          { id: 3, label: 'تصوير الزفاف', icon: 'ph-heart', activeClass: 'bg-pink-900/40 text-pink-400 border-pink-500/50 shadow-lg shadow-pink-900/20', inactiveClass: 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800', clientIconCompleted: 'bg-pink-500 text-white shadow-lg shadow-pink-500/40 border-pink-900', clientCardCurrent: 'bg-pink-900/20 border-pink-500/50 shadow-lg shadow-pink-900/20', clientTextCurrent: 'text-pink-400' },
+          { id: 4, label: 'جاري العمل والطباعة', icon: 'ph-printer', activeClass: 'bg-orange-900/40 text-orange-400 border-orange-500/50 shadow-lg shadow-orange-900/20', inactiveClass: 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800', clientIconCompleted: 'bg-orange-500 text-white shadow-lg shadow-orange-500/40 border-orange-900', clientCardCurrent: 'bg-orange-900/20 border-orange-500/50 shadow-lg shadow-orange-900/20', clientTextCurrent: 'text-orange-400' },
+          { id: 5, label: 'جاهز للإستلام', icon: 'ph-check-circle', activeClass: 'bg-green-900/40 text-green-400 border-green-500/50 shadow-lg shadow-green-900/20', inactiveClass: 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800', clientIconCompleted: 'bg-green-500 text-white shadow-lg shadow-green-500/40 border-green-900', clientCardCurrent: 'bg-green-900/20 border-green-500/50 shadow-lg shadow-green-900/20', clientTextCurrent: 'text-green-400' },
+          { id: 6, label: 'تم التسليم', icon: 'ph-package', activeClass: 'bg-purple-900/40 text-purple-400 border-purple-500/50 shadow-lg shadow-purple-900/20', inactiveClass: 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800', clientIconCompleted: 'bg-purple-500 text-white shadow-lg shadow-purple-500/40 border-purple-900', clientCardCurrent: 'bg-purple-900/20 border-purple-500/50 shadow-lg shadow-purple-900/20', clientTextCurrent: 'text-purple-400' }
+        ];
+
         const DEFAULT_SERVICES = [
           { name: "صورة شخصية", price: 70, desc: "مقاس 4x6 استلام بعد يوم من تاريخ التصوير" },
           { name: "صورة شخصية فورى", price: 90, desc: "استلام فورى بعد 10 دقائق" },
@@ -283,6 +293,15 @@
 
             window.open(googleCalendarUrl, '_blank');
             return true;
+        };
+
+        const getTransactionStatuses = (txn) => {
+            if (txn.type !== 'wedding') return ORDER_STATUSES;
+            return WEDDING_STATUSES.filter(s => {
+                if (s.id === 1 && !txn.casualShootDate) return false;
+                if (s.id === 2 && !(txn.addons && txn.addons.some(a => a.name.includes('حنة') || a.name.includes('حنه')))) return false;
+                return true;
+            });
         };
 
 
@@ -654,6 +673,8 @@
             const cashPaid = (txn.paid || 0) - (txn.electronicPaid || 0);
             const isWedding = txn.type === 'wedding';
             const displayName = isWedding ? `${txn.groomName || ''} و ${txn.brideName || ''}`.trim() : txn.clientName;
+            
+            const statusesToUse = getTransactionStatuses(txn);
 
             const handleAddToCalendar = (e) => {
                 e.stopPropagation();
@@ -724,15 +745,15 @@
 
                   <div className="mt-5 pt-4 border-t border-slate-800" onClick={e => e.stopPropagation()}>
                     <h4 className="text-xs font-bold text-slate-400 mb-3">تحديث حالة الطلب (التتبع):</h4>
-                    <div className="flex gap-2">
-                        {ORDER_STATUSES.map(s => (
+                    <div className="flex flex-wrap gap-2">
+                        {statusesToUse.map(s => (
                             <button
                                 key={s.id}
                                 onClick={() => updateStatus(txn.id, s.id)}
-                                className={`flex-1 py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center gap-1 border ${currentStatus === s.id ? s.activeClass : s.inactiveClass}`}
+                                className={`flex-1 min-w-[70px] py-2 px-1 rounded-xl text-[10px] sm:text-xs font-bold transition-all flex flex-col items-center gap-1 border ${currentStatus === s.id ? s.activeClass : s.inactiveClass}`}
                             >
                                 <i className={`ph ${s.icon} text-lg`}></i>
-                                <span className="text-[10px] sm:text-xs text-center">{s.label}</span>
+                                <span className="text-center leading-tight">{s.label}</span>
                             </button>
                         ))}
                     </div>
@@ -1710,6 +1731,7 @@
           const [transferReceipt, setTransferReceipt] = useState(null);
           const [isUploading, setIsUploading] = useState(false);
           const [clientViewError, setClientViewError] = useState('');
+          const [feedbackText, setFeedbackText] = useState('');
           
           const [transactions, setTransactions] = useState([]);
           const [weddings, setWeddings] = useState([]);
@@ -1877,6 +1899,8 @@
               const isWedding = trackType === 'w';
               const displayName = isWedding ? `${txn.groomName || ''} و ${txn.brideName || ''}`.trim() : txn.clientName;
               const displayReqs = getReqsText(txn);
+              
+              const statusesToUse = getTransactionStatuses(txn);
 
               return (
                   <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-6 flex flex-col items-center">
@@ -1885,6 +1909,18 @@
                           <h1 className="text-2xl font-black">{settings.studioName}</h1>
                           <p className="text-slate-400 text-sm">{isWedding ? 'تتبع حجز الزفاف الخاص بك 💍' : 'تتبع حالة الطلب الخاص بك'}</p>
                       </div>
+
+                      {isWedding && (
+                          <div className="w-full max-w-md bg-gradient-to-br from-pink-950/40 to-slate-900 p-6 rounded-3xl border border-pink-500/20 mb-8 text-center shadow-lg">
+                              <div className="w-16 h-16 bg-pink-500/20 text-pink-400 rounded-full flex items-center justify-center mx-auto mb-4 border border-pink-500/30">
+                                  <i className="ph-fill ph-heart text-3xl"></i>
+                              </div>
+                              <h2 className="text-xl font-bold text-pink-300 mb-2">شكراً لاختياركم {settings.studioName}</h2>
+                              <p className="text-sm text-pink-200/80 leading-relaxed font-medium">
+                                  يسعدنا ونتشرف بأن نكون جزءاً من أجمل لحظات حياتكم. نسعى دائماً لتوثيق ذكرياتكم بأفضل جودة وحب لتدوم للأبد. ألف مبروك للعروسين! 🎉💍
+                              </p>
+                          </div>
+                      )}
 
                       <div className="bg-slate-900 w-full max-w-md p-6 rounded-3xl shadow-xl border border-slate-800 mb-8 relative overflow-hidden">
                           <div className={`absolute top-0 right-0 w-2 h-full ${isWedding ? 'bg-pink-500' : 'bg-blue-500'}`}></div>
@@ -2002,7 +2038,7 @@
                           <h3 className="font-bold text-lg mb-8 flex items-center gap-2 border-b border-slate-800 pb-4"><i className="ph ph-clock-counter-clockwise text-blue-500"></i> مراحل تجهيز الطلب:</h3>
                           <div className="relative pl-4 space-y-8 pr-4">
                               <div className="absolute right-[31px] top-6 bottom-6 w-[2px] bg-slate-800"></div>
-                              {ORDER_STATUSES.map((s, index) => {
+                              {statusesToUse.map((s, index) => {
                                   const isCompleted = currentStatus >= s.id;
                                   const isCurrent = currentStatus === s.id;
                                   return (
@@ -2020,6 +2056,35 @@
                               })}
                           </div>
                       </div>
+
+                      {/* Feedback Box */}
+                      <div className="w-full max-w-md bg-gradient-to-br from-slate-900 to-slate-950 p-6 rounded-3xl shadow-xl border border-slate-800 mb-8 relative overflow-hidden">
+                          <div className="absolute top-0 right-0 w-1 h-full bg-yellow-500"></div>
+                          <h3 className="font-bold text-lg mb-3 flex items-center gap-2 text-slate-100">
+                              <i className="ph-fill ph-star text-yellow-500 text-2xl"></i> رأيك يهمنا
+                          </h3>
+                          <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+                              نسعى دائماً لتقديم الأفضل لكم. كيف كانت تجربتكم معنا؟ يسعدنا سماع رأيكم أو أي ملاحظات لتطوير خدماتنا.
+                          </p>
+                          <textarea 
+                              value={feedbackText}
+                              onChange={(e) => setFeedbackText(e.target.value)}
+                              placeholder="اكتب رسالتك وتقييمك هنا..." 
+                              className="w-full p-4 rounded-xl bg-slate-950/50 border border-slate-700 text-sm text-white mb-4 outline-none focus:border-yellow-500 focus:bg-slate-900 transition-colors custom-scrollbar resize-none shadow-inner"
+                              rows="4"
+                          ></textarea>
+                          <button 
+                              onClick={() => {
+                                  if(!feedbackText.trim()) return;
+                                  const msg = `مرحباً، أنا ${displayName} (إيصال #${txn.receiptNo}).\nهذا تقييمي:\n"${feedbackText}"`;
+                                  window.open(`https://wa.me/201201260040?text=${encodeURIComponent(msg)}`, '_blank');
+                              }}
+                              className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 text-sm border border-slate-700 hover:border-yellow-500/50 shadow-md group"
+                          >
+                              <i className="ph-fill ph-paper-plane-right text-lg text-yellow-500 group-hover:scale-110 transition-transform"></i> إرسال التقييم للإدارة
+                          </button>
+                      </div>
+                      
                   </div>
               );
           }
