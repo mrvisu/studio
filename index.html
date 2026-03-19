@@ -336,7 +336,7 @@
             window.open(url, '_blank');
           };
 
-          // Function to add a wedding event to the device's calendar via .ics file
+          // Function to add a wedding event to Google Calendar
           const addToCalendar = (txn) => {
             if (!txn.weddingDate) {
                 return false;
@@ -368,12 +368,11 @@
             details.push(`المدفوع: ${txn.paid} ج.م`);
             details.push(`الباقي: ${txn.remaining} ج.م`);
 
-            const description = details.join('\\n');
+            const description = details.join('\n');
             const title = `حجز زفاف: ${txn.groomName || ''} و ${txn.brideName || ''}`.trim() || 'حجز زفاف جديد';
 
             let startStr = '';
             let endStr = '';
-            let isAllDay = false;
 
             const datePart = txn.weddingDate.replace(/-/g, '');
 
@@ -381,43 +380,30 @@
                 const startDate = new Date(`${txn.weddingDate}T${txn.leaveTime}`);
                 const endDate = new Date(startDate.getTime() + 5 * 60 * 60 * 1000); 
                 
-                const formatICSDate = (date) => {
+                const formatGoogleDate = (date) => {
                     return date.getFullYear() +
                         String(date.getMonth() + 1).padStart(2, '0') +
                         String(date.getDate()).padStart(2, '0') + 'T' +
                         String(date.getHours()).padStart(2, '0') +
                         String(date.getMinutes()).padStart(2, '0') + '00';
                 };
-                startStr = formatICSDate(startDate);
-                endStr = formatICSDate(endDate);
+                startStr = formatGoogleDate(startDate);
+                endStr = formatGoogleDate(endDate);
             } else {
-                isAllDay = true;
                 startStr = datePart;
                 const nextDay = new Date(txn.weddingDate);
                 nextDay.setDate(nextDay.getDate() + 1);
                 endStr = nextDay.getFullYear() + String(nextDay.getMonth() + 1).padStart(2, '0') + String(nextDay.getDate()).padStart(2, '0');
             }
 
-            const icsContent = [
-                'BEGIN:VCALENDAR',
-                'VERSION:2.0',
-                'BEGIN:VEVENT',
-                isAllDay ? `DTSTART;VALUE=DATE:${startStr}` : `DTSTART:${startStr}`,
-                isAllDay ? `DTEND;VALUE=DATE:${endStr}` : `DTEND:${endStr}`,
-                `SUMMARY:${title}`,
-                `DESCRIPTION:${description}`,
-                `LOCATION:${txn.location || ''}`,
-                'END:VEVENT',
-                'END:VCALENDAR'
-            ].join('\r\n');
+            const encodedTitle = encodeURIComponent(title);
+            const encodedDetails = encodeURIComponent(description);
+            const encodedLocation = encodeURIComponent(txn.location || '');
+            const dates = `${startStr}/${endStr}`;
 
-            const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-            const link = document.createElement('a');
-            link.href = window.URL.createObjectURL(blob);
-            link.setAttribute('download', `wedding_${txn.receiptNo}.ics`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodedTitle}&dates=${dates}&details=${encodedDetails}&location=${encodedLocation}`;
+
+            window.open(googleCalendarUrl, '_blank');
             return true;
           };
 
@@ -571,7 +557,7 @@
                                       const targetCol = isWedding ? 'weddings' : 'transactions';
                                       await setDoc(doc(db, `artifacts/${appId}/public/data/${targetCol}`, txn.id), updated);
                                       const confirmMsg = `مرحباً، قمت بتحويل مبلغ ${txn.remaining} ج.م لسداد باقي حساب إيصال رقم #${txn.receiptNo} باسم ${displayName}.\n✅ وقمت برفع صورة التحويل في رابط التتبع لتأكيد الدفع.`;
-                                      openWhatsApp('01126810107', confirmMsg);
+                                      openWhatsApp('01201260040', confirmMsg);
                                   } catch (err) { setClientViewError('حدث خطأ أثناء الحفظ، يرجى المحاولة مرة أخرى.'); }
                                   setIsUploading(false);
                               }} disabled={isUploading} className={`w-full font-bold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 ${isUploading || !transferReceipt ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500 text-white shadow-green-900/20'}`}>
