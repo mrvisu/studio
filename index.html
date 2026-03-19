@@ -70,7 +70,7 @@
 
     <script type="text/babel" data-type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
         const { useState, useEffect, useMemo } = React;
@@ -132,170 +132,48 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        function App() {
-          const [activeTab, setActiveTab] = useState('dashboard');
-          const [user, setUser] = useState(null);
-          const [authReady, setAuthReady] = useState(false);
-          const [authError, setAuthError] = useState(null);
-          const [dataLoaded, setDataLoaded] = useState(false);
-          const [showNotFound, setShowNotFound] = useState(false);
-          const [transferReceipt, setTransferReceipt] = useState(null);
-          const [isUploading, setIsUploading] = useState(false);
-          const [clientViewError, setClientViewError] = useState('');
-          
-          const [transactions, setTransactions] = useState([]);
-          const [weddings, setWeddings] = useState([]);
-          const [expenses, setExpenses] = useState([]);
-          const [inventory, setInventory] = useState({});
-          const [settings, setSettings] = useState({
-            nextReceiptNo: 1000,
-            services: DEFAULT_SERVICES,
-            products: DEFAULT_PRODUCTS,
-            weddingPackages: DEFAULT_WEDDING_PACKAGES,
-            expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
-            waTemplates: DEFAULT_WA_TEMPLATES,
-            studioName: "ستوديو المراكبى",
-            studioLogo: ""
-          });
-
-          const urlParams = new URLSearchParams(window.location.search);
-          const trackPhone = urlParams.get('phone');
-          const trackReceipt = urlParams.get('receipt');
-          const trackType = urlParams.get('type') || 't'; 
-          const isTracking = trackPhone && trackReceipt;
-
-          useEffect(() => {
-            const initAuth = async () => {
-              try { await signInAnonymously(auth); } 
-              catch (error) { setAuthError("تنبيه: يوجد مشكلة في الاتصال بقاعدة البيانات."); setAuthReady(true); }
-            };
-            initAuth();
-            const unsubscribe = onAuthStateChanged(auth, (u) => { setUser(u); setAuthReady(true); });
-            return () => unsubscribe();
-          }, []);
-
-          useEffect(() => {
-            if (!user) return;
-            const appId = 'studio-marakby';
-            const basePath = `artifacts/${appId}/public/data`;
-
-            const fetchSettings = async () => {
-              const docSnap = await getDoc(doc(db, basePath, 'settings', 'main'));
-              if (docSnap.exists()) {
-                let data = docSnap.data();
-                if (data.services) data.services = data.services.map(s => typeof s === 'string' ? { name: s, price: 0, desc: '' } : { name: s.name, price: s.price || 0, desc: s.desc || '' });
-                if (!data.products) data.products = DEFAULT_PRODUCTS;
-                else data.products = data.products.map(p => typeof p === 'string' ? { name: p, price: 0, desc: '' } : { name: p.name, price: p.price || 0, desc: p.desc || '' });
-                if (!data.weddingPackages) data.weddingPackages = DEFAULT_WEDDING_PACKAGES;
-                
-                if (!data.expenseCategories || data.expenseCategories.length < 5) data.expenseCategories = DEFAULT_EXPENSE_CATEGORIES;
-
-                if(!data.waTemplates) data.waTemplates = DEFAULT_WA_TEMPLATES;
-                if (data.waTemplates.invoice && !data.waTemplates.invoice.includes('{track_url}')) {
-                    data.waTemplates.invoice = DEFAULT_WA_TEMPLATES.invoice;
-                } else if (data.waTemplates.invoice && !data.waTemplates.invoice.includes('{time}')) {
-                    data.waTemplates.invoice = data.waTemplates.invoice.replace('📅 التاريخ: {date}', '📅 التاريخ: {date}\n⏰ الوقت: {time}');
-                }
-
-                setSettings(data);
-              }
-            };
-            fetchSettings();
-
-            const unsubInv = onSnapshot(doc(db, basePath, 'inventory', 'main'), (docSnap) => {
-              if (docSnap.exists()) setInventory(docSnap.data());
-            }, (err) => console.error(err));
-
-            const unsubTxns = onSnapshot(collection(db, basePath, 'transactions'), (snapshot) => {
-              const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-              data.sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
-              setTransactions(data);
-              if(trackType !== 'w') setDataLoaded(true);
-            });
-
-            const unsubWeds = onSnapshot(collection(db, basePath, 'weddings'), (snapshot) => {
-              const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-              data.sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
-              setWeddings(data);
-              if(trackType === 'w') setDataLoaded(true);
-            });
-
-            if(!isTracking) {
-                const unsubExps = onSnapshot(collection(db, basePath, 'expenses'), (snapshot) => {
-                  const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                  data.sort((a, b) => new Date(b.date) - new Date(a.date));
-                  setExpenses(data);
-                });
-                return () => { unsubTxns(); unsubWeds(); unsubExps(); unsubInv(); };
-            }
-
-            return () => { unsubTxns(); unsubWeds(); unsubInv(); };
-          }, [user, isTracking, trackType]);
-
-          useEffect(() => {
-            if (!user || isTracking) return; 
-            const timer = setTimeout(() => {
-              const appId = 'studio-marakby';
-              setDoc(doc(db, `artifacts/${appId}/public/data/settings`, 'main'), settings);
-            }, 1500);
-            return () => clearTimeout(timer);
-          }, [settings, user, isTracking]);
-
-          // Client View Tracking & Recording
-          useEffect(() => {
-              if (isTracking && dataLoaded) {
-                  const targetArr = trackType === 'w' ? weddings : transactions;
-                  const currentTxn = targetArr.find(t => t.phone === trackPhone && t.receiptNo.toString() === trackReceipt);
-                  
-                  if (!currentTxn) {
-                      const timer = setTimeout(() => setShowNotFound(true), 2500);
-                      return () => clearTimeout(timer);
-                  } else {
-                      setShowNotFound(false);
-                      if (!currentTxn.viewedByClient) {
-                          const appId = 'studio-marakby';
-                          const targetCol = trackType === 'w' ? 'weddings' : 'transactions';
-                          const updated = { ...currentTxn, viewedByClient: true, viewTime: new Date().toISOString() };
-                          setDoc(doc(db, `artifacts/${appId}/public/data/${targetCol}`, currentTxn.id), updated).catch(err => console.error(err));
-                      }
-                  }
-              }
-          }, [isTracking, dataLoaded, transactions, weddings, trackPhone, trackReceipt, trackType]);
-
-          const updateInventory = async (itemName, change) => {
-            const newInv = { ...inventory, [itemName]: Math.max(0, (inventory[itemName] || 0) + change) };
-            setInventory(newInv);
-            if (user) {
-               const appId = 'studio-marakby';
-               await setDoc(doc(db, `artifacts/${appId}/public/data/inventory`, 'main'), newInv);
-            }
-          };
-
-          const formatCurrency = (num) => Number(num || 0).toLocaleString('ar-EG') + ' ج.م';
-          const formatDate = (dateStr) => {
-             if(!dateStr) return '';
-             return new Date(dateStr).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' });
-          };
-          const formatDateOnly = (dateStr) => {
+        // --- Helper Functions ---
+        const formatCurrency = (num) => Number(num || 0).toLocaleString('ar-EG') + ' ج.م';
+        
+        const formatDateOnly = (dateStr) => {
              if(!dateStr) return '';
              return new Date(dateStr).toLocaleDateString('ar-EG');
-          }
-          const formatTimeOnly = (dateStr) => {
+        };
+        
+        const formatDate = (dateStr) => {
+             if(!dateStr) return '';
+             return new Date(dateStr).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' });
+        };
+        
+        const formatTimeOnly = (dateStr) => {
              if(!dateStr) return '';
              const d = new Date(dateStr);
              if(isNaN(d.getTime())) return dateStr; 
              return d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
-          };
-          
-          const generateWA_Message = (templateKey, txn, isWedding = false) => {
+        };
+
+        const getReqsText = (txn) => {
+            if (txn.type === 'wedding') {
+                const pkgs = txn.packages && txn.packages.length > 0 
+                             ? txn.packages.map(p=>p.name).join(' + ') 
+                             : (txn.package ? txn.package.name : 'بدون باقة محددة');
+                const casualText = txn.casualShootDate ? formatDateOnly(txn.casualShootDate) : 'لا يوجد';
+                let addonsText = 'لا يوجد';
+                if (txn.addons && txn.addons.length > 0) {
+                    addonsText = txn.addons.map(a => a.name + (a.notes ? ` (${a.notes})` : '')).join(' + ');
+                }
+                return `الباقات: ${pkgs}\nالسيشن: ${txn.sessionType || 'غير محدد'}\nالكاجوال: ${casualText}\nإضافات: ${addonsText}`;
+            }
+            return txn.requirements || 'لا يوجد تفاصيل';
+        };
+
+        const generateWA_Message = (templateKey, txn, settings, isWedding = false) => {
             let msg = settings.waTemplates[templateKey] || "";
             const clientName = isWedding ? `${txn.groomName || ''} و ${txn.brideName || ''}`.trim() : txn.clientName;
             
             let reqs = '';
             if (isWedding) {
-                const pkgs = txn.packages && txn.packages.length > 0 
-                             ? txn.packages.map(p=>p.name).join(' + ') 
-                             : (txn.package ? txn.package.name : '');
+                const pkgs = txn.packages && txn.packages.length > 0 ? txn.packages.map(p=>p.name).join(' + ') : (txn.package ? txn.package.name : '');
                 if (pkgs) reqs += `الباقات: ${pkgs}\n`;
                 if (txn.weddingDate) reqs += `موعد الزفاف: ${formatDateOnly(txn.weddingDate)}\n`;
                 if (txn.location) reqs += `مكان التصوير: ${txn.location}\n`;
@@ -325,22 +203,19 @@
             const trackUrl = window.location.href.split('?')[0] + `?phone=${encodeURIComponent(txn.phone)}&receipt=${encodeURIComponent(txn.receiptNo)}&type=${typeParam}`;
             msg = msg.replace(/{track_url}/g, trackUrl);
             return msg;
-          };
+        };
 
-          const openWhatsApp = (phone, msg) => {
+        const openWhatsApp = (phone, msg) => {
             if(!phone) return;
             let formattedPhone = phone.trim();
             if (formattedPhone.startsWith('0')) formattedPhone = '2' + formattedPhone;
             else if (!formattedPhone.startsWith('2')) formattedPhone = '20' + formattedPhone;
             const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`;
             window.open(url, '_blank');
-          };
+        };
 
-          // Function to add a wedding event to Google Calendar
-          const addToCalendar = (txn) => {
-            if (!txn.weddingDate) {
-                return false;
-            }
+        const addToCalendar = (txn) => {
+            if (!txn.weddingDate) return false;
 
             const details = [];
             if (txn.groomName || txn.brideName) details.push(`العروسين: ${txn.groomName || ''} و ${txn.brideName || ''}`.trim());
@@ -353,16 +228,11 @@
             if (txn.groomAddress) details.push(`العنوان: ${txn.groomAddress}`);
             
             let pkgs = '';
-            if (txn.packages && txn.packages.length > 0) {
-                pkgs = txn.packages.map(p => p.name).join(' + ');
-            } else if (txn.package) {
-                pkgs = txn.package.name;
-            }
+            if (txn.packages && txn.packages.length > 0) pkgs = txn.packages.map(p => p.name).join(' + ');
+            else if (txn.package) pkgs = txn.package.name;
             if (pkgs) details.push(`الباقات: ${pkgs}`);
             
-            if (txn.addons && txn.addons.length > 0) {
-                details.push(`إضافات: ${txn.addons.map(a => a.name).join(' + ')}`);
-            }
+            if (txn.addons && txn.addons.length > 0) details.push(`إضافات: ${txn.addons.map(a => a.name).join(' + ')}`);
             
             details.push(`الإجمالي: ${txn.total} ج.م`);
             details.push(`المدفوع: ${txn.paid} ج.م`);
@@ -405,196 +275,12 @@
 
             window.open(googleCalendarUrl, '_blank');
             return true;
-          };
+        };
 
-          // --- Client Tracking View ---
-          if (isTracking && authReady) {
-              const targetArr = trackType === 'w' ? weddings : transactions;
-              const txn = targetArr.find(t => t.phone === trackPhone && t.receiptNo.toString() === trackReceipt);
 
-              if (!dataLoaded || (!txn && !showNotFound)) {
-                  return (
-                      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-100 p-6 text-center">
-                          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                          <h2 className="text-xl font-bold mb-2 text-white">جاري البحث عن الطلب...</h2>
-                          <p className="text-slate-400 text-sm">لحظات ونعرض لك التفاصيل</p>
-                      </div>
-                  );
-              }
-              
-              if (!txn && showNotFound) return (
-                  <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 p-6 text-center">
-                      <i className="ph ph-magnifying-glass text-6xl mb-4 text-slate-600"></i>
-                      <h2 className="text-2xl font-bold mb-2 text-white">الطلب غير موجود</h2>
-                      <p>عذراً، لم نتمكن من العثور على طلب يطابق رقم الهاتف والإيصال المدخلين.</p>
-                      <p className="mt-2 text-sm opacity-70">رقم الهاتف: {trackPhone} | رقم الإيصال: {trackReceipt}</p>
-                  </div>
-              );
-              
-              const currentStatus = txn.status || 0;
-              const isWedding = trackType === 'w';
-              const displayName = isWedding ? `${txn.groomName || ''} و ${txn.brideName || ''}`.trim() : txn.clientName;
-              
-              let displayReqs = '';
-              if (isWedding) {
-                  const pkgs = txn.packages && txn.packages.length > 0 ? txn.packages.map(p=>p.name).join(' + ') : (txn.package ? txn.package.name : '');
-                  if (pkgs) displayReqs += `الباقات: ${pkgs}\n`;
-                  if (txn.location) displayReqs += `اللوكيشن/القاعة: ${txn.location}\n`;
-                  if (txn.makeupArtist) displayReqs += `الميك أب: ${txn.makeupArtist}\n`;
-                  if (txn.sessionType) displayReqs += `نوع السيشن: ${txn.sessionType}\n`;
-                  if (txn.addons && txn.addons.length > 0) displayReqs += `إضافات: ${txn.addons.map(a => `${a.name}${a.notes ? ' ('+a.notes+')' : ''}`).join(' + ')}\n`;
-              } else {
-                  displayReqs = txn.requirements;
-              }
+        // --- Extracted UI Components ---
 
-              return (
-                  <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-6 flex flex-col items-center">
-                      <div className="flex flex-col items-center gap-3 mb-8 mt-6">
-                          {settings.studioLogo ? <img src={settings.studioLogo} className="w-24 h-24 rounded-2xl object-cover shadow-lg shadow-blue-900/20 border border-slate-800" /> : <i className="ph ph-camera text-6xl text-blue-500"></i>}
-                          <h1 className="text-2xl font-black">{settings.studioName}</h1>
-                          <p className="text-slate-400 text-sm">{isWedding ? 'تتبع حجز الزفاف الخاص بك 💍' : 'تتبع حالة الطلب الخاص بك'}</p>
-                      </div>
-
-                      <div className="bg-slate-900 w-full max-w-md p-6 rounded-3xl shadow-xl border border-slate-800 mb-8 relative overflow-hidden">
-                          <div className={`absolute top-0 right-0 w-2 h-full ${isWedding ? 'bg-pink-500' : 'bg-blue-500'}`}></div>
-                          <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-800">
-                              <span className="text-slate-400 text-sm">إيصال رقم</span>
-                              <span className="text-2xl font-black font-mono text-white">#{txn.receiptNo}</span>
-                          </div>
-                          <h3 className={`text-xl font-bold mb-2 flex items-center gap-2 ${isWedding ? 'text-pink-400' : 'text-blue-400'}`}>
-                             {isWedding ? <i className="ph ph-heart"></i> : <i className="ph ph-user"></i>} {displayName}
-                          </h3>
-                          <p className="text-sm text-slate-400 mb-5 leading-relaxed whitespace-pre-wrap">{displayReqs}</p>
-                          
-                          {isWedding && txn.weddingDate && (
-                              <div className="bg-slate-950 p-3 rounded-xl mb-4 border border-slate-800 flex items-center justify-between text-sm">
-                                  <span className="text-slate-400">موعد الزفاف:</span>
-                                  <span className="font-bold text-pink-300">{formatDateOnly(txn.weddingDate)}</span>
-                              </div>
-                          )}
-
-                          <div className="flex justify-between bg-slate-950 p-4 rounded-2xl border border-slate-800 text-sm">
-                               <div className="flex flex-col items-center gap-1">
-                                   <span className="text-slate-500 text-xs">المدفوع</span>
-                                   <span className="text-green-400 font-bold">{txn.paid} ج.م</span>
-                               </div>
-                               <div className="w-px bg-slate-800"></div>
-                               <div className="flex flex-col items-center gap-1">
-                                   <span className="text-slate-500 text-xs">الباقي الدفع</span>
-                                   <span className="text-red-400 font-bold">{txn.remaining} ج.م</span>
-                               </div>
-                          </div>
-                      </div>
-
-                      {/* Electronic Payment Info Card (Appears only if there is remaining amount) */}
-                      {txn.remaining > 0 && (
-                          <div className="w-full max-w-md bg-gradient-to-br from-indigo-950 to-slate-900 p-6 rounded-3xl shadow-xl border border-indigo-500/30 mb-8 text-center relative overflow-hidden">
-                              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
-                              <div className="flex justify-center mb-4">
-                                  <div className="bg-indigo-500/20 p-4 rounded-full text-indigo-400 shadow-lg shadow-indigo-900/20">
-                                      <i className="ph ph-wallet text-3xl"></i>
-                                  </div>
-                              </div>
-                              <h3 className="text-lg font-bold text-white mb-2">سداد إلكتروني متاح 💳</h3>
-                              <p className="text-sm text-indigo-200/80 leading-relaxed mb-4">
-                                  لراحتك، يمكنك الآن سداد باقي المبلغ المستحق (<b className="text-white">{txn.remaining} ج.م</b>) بكل سهولة عبر 
-                                  <span className="text-white font-bold mx-1">إنستاباي (InstaPay)</span> أو <span className="text-white font-bold mx-1">المحافظ الإلكترونية</span>.
-                              </p>
-                              
-                              <div className="bg-slate-950/80 py-3 px-4 rounded-2xl border border-indigo-500/20 flex flex-col items-center gap-1 shadow-inner mb-4">
-                                  <span className="text-xs text-indigo-300">رقم التحويل (فودافون كاش / إنستاباي):</span>
-                                  <div className="flex items-center gap-3 mt-1">
-                                      <span className="text-2xl font-black font-mono text-white tracking-widest">01126810107</span>
-                                      <button onClick={(e) => {
-                                          const el = document.createElement('textarea');
-                                          el.value = '01126810107';
-                                          document.body.appendChild(el);
-                                          el.select();
-                                          document.execCommand('copy');
-                                          document.body.removeChild(el);
-                                          const originalHTML = e.currentTarget.innerHTML;
-                                          e.currentTarget.innerHTML = '<i class="ph ph-check text-lg"></i>';
-                                          setTimeout(() => e.currentTarget.innerHTML = originalHTML, 2000);
-                                      }} className="text-indigo-400 hover:text-indigo-300 bg-indigo-900/30 p-2 rounded-lg transition-colors" title="نسخ الرقم"><i className="ph ph-copy text-lg"></i></button>
-                                  </div>
-                              </div>
-
-                              <div className="mb-5 text-right bg-indigo-900/20 p-4 rounded-xl border border-indigo-500/30">
-                                  <label className="block text-sm font-bold text-indigo-300 mb-3"><i className="ph ph-upload-simple text-lg align-middle ml-1"></i> إرفاق صورة التحويل أولاً لتأكيد السداد:</label>
-                                  <input type="file" accept="image/*" onChange={(e) => {
-                                          const file = e.target.files[0];
-                                          if (!file) return;
-                                          const reader = new FileReader();
-                                          reader.readAsDataURL(file);
-                                          reader.onload = (event) => {
-                                              const img = new Image();
-                                              img.src = event.target.result;
-                                              img.onload = () => {
-                                                  const canvas = document.createElement('canvas');
-                                                  const MAX_WIDTH = 800;
-                                                  let scaleSize = 1;
-                                                  if (img.width > MAX_WIDTH) scaleSize = MAX_WIDTH / img.width;
-                                                  canvas.width = img.width * scaleSize;
-                                                  canvas.height = img.height * scaleSize;
-                                                  const ctx = canvas.getContext('2d');
-                                                  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                                                  setTransferReceipt(canvas.toDataURL('image/jpeg', 0.6));
-                                                  setClientViewError('');
-                                              };
-                                          };
-                                      }} className="block w-full text-sm text-slate-400 file:ml-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 transition-colors bg-slate-950 rounded-xl"
-                                  />
-                                  {clientViewError && <p className="text-red-400 text-xs mt-2 font-bold flex items-center gap-1"><i className="ph ph-warning text-base"></i> {clientViewError}</p>}
-                                  {transferReceipt && <p className="text-green-400 text-xs mt-3 font-bold flex items-center gap-1"><i className="ph ph-check-circle text-base"></i> تم إرفاق الصورة بنجاح وجاهز للتأكيد</p>}
-                              </div>
-
-                              <button onClick={async () => {
-                                  if (!transferReceipt) { setClientViewError('عذراً، برجاء إرفاق صورة التحويل أولاً لتأكيد السداد.'); return; }
-                                  setIsUploading(true);
-                                  try {
-                                      const appId = 'studio-marakby';
-                                      const updated = { ...txn, pendingReceipt: transferReceipt };
-                                      const targetCol = isWedding ? 'weddings' : 'transactions';
-                                      await setDoc(doc(db, `artifacts/${appId}/public/data/${targetCol}`, txn.id), updated);
-                                      const confirmMsg = `مرحباً، قمت بتحويل مبلغ ${txn.remaining} ج.م لسداد باقي حساب إيصال رقم #${txn.receiptNo} باسم ${displayName}.\n✅ وقمت برفع صورة التحويل في رابط التتبع لتأكيد الدفع.`;
-                                      openWhatsApp('01201260040', confirmMsg);
-                                  } catch (err) { setClientViewError('حدث خطأ أثناء الحفظ، يرجى المحاولة مرة أخرى.'); }
-                                  setIsUploading(false);
-                              }} disabled={isUploading} className={`w-full font-bold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 ${isUploading || !transferReceipt ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500 text-white shadow-green-900/20'}`}>
-                                  {isUploading ? <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <><i className="ph ph-whatsapp-logo text-2xl"></i> تأكيد التحويل عبر واتساب</>}
-                              </button>
-                          </div>
-                      )}
-
-                      {/* Timeline */}
-                      <div className="w-full max-w-md bg-slate-900 p-6 sm:p-8 rounded-3xl shadow-xl border border-slate-800 mb-8">
-                          <h3 className="font-bold text-lg mb-8 flex items-center gap-2 border-b border-slate-800 pb-4"><i className="ph ph-clock-counter-clockwise text-blue-500"></i> مراحل تجهيز الطلب:</h3>
-                          <div className="relative pl-4 space-y-8 pr-4">
-                              <div className="absolute right-[31px] top-6 bottom-6 w-[2px] bg-slate-800"></div>
-                              {ORDER_STATUSES.map((s, index) => {
-                                  const isCompleted = currentStatus >= s.id;
-                                  const isCurrent = currentStatus === s.id;
-                                  return (
-                                      <div key={s.id} className="relative flex items-start gap-5">
-                                          <div className={`relative z-10 flex items-center justify-center w-12 h-12 rounded-full shrink-0 border-4 transition-colors ${isCompleted ? s.clientIconCompleted : 'border-slate-900 bg-slate-800 text-slate-600'}`}>
-                                              <i className={`ph ${s.icon} text-xl`}></i>
-                                          </div>
-                                          <div className={`flex-1 p-4 rounded-2xl border transition-all mt-[-4px] ${isCurrent ? s.clientCardCurrent : isCompleted ? 'bg-slate-800/30 border-slate-800/50' : 'bg-slate-950/50 border-slate-800/30'}`}>
-                                              <h4 className={`font-bold text-sm sm:text-base ${isCurrent ? s.clientTextCurrent : isCompleted ? 'text-slate-200' : 'text-slate-600'}`}>{s.label}</h4>
-                                              {isCurrent && <p className={`text-xs mt-2 opacity-80 leading-relaxed ${s.clientTextCurrent}`}>هذه هي المرحلة الحالية لطلبك. سنقوم بتحديثها فور انتقالنا للمرحلة التالية.</p>}
-                                              {(isCompleted && !isCurrent) && <p className="text-xs mt-1 text-slate-500"><i className="ph ph-check"></i> تمت بنجاح</p>}
-                                          </div>
-                                      </div>
-                                  );
-                              })}
-                          </div>
-                      </div>
-                  </div>
-              );
-          }
-
-          // --- Admin Components ---
-          const Navigation = () => {
+        const Navigation = ({ settings, activeTab, setActiveTab }) => {
             const navItems = [
               { id: 'dashboard', icon: <i className="ph ph-squares-four text-xl"></i>, label: 'الرئيسية' },
               { id: 'weddings', icon: <i className="ph ph-heart text-xl"></i>, label: 'حجوزات الزفاف 💍' },
@@ -636,9 +322,26 @@
                 </div>
               </nav>
             );
-          };
+        };
 
-          const QuickServiceCard = ({ srvObj, onAdd, colorTheme = 'blue' }) => {
+        const StatCard = ({title, value, color, highlight}) => {
+            const colors = { 
+                green: "bg-green-950/30 text-green-400 border-green-900/50", 
+                red: "bg-red-950/30 text-red-400 border-red-900/50", 
+                blue: "bg-blue-950/30 text-blue-400 border-blue-900/50", 
+                indigo: "bg-indigo-950/30 text-indigo-400 border-indigo-900/50",
+                emerald: "bg-emerald-600 text-white border-emerald-500", 
+                rose: "bg-rose-600 text-white border-rose-500" 
+            };
+            return (
+              <div className={`p-3 sm:p-4 rounded-xl border ${colors[color]} ${highlight ? 'shadow-lg scale-105' : ''}`}>
+                <h4 className="text-[11px] sm:text-xs opacity-80 mb-1">{title}</h4>
+                <div className="text-base sm:text-lg font-black">{formatCurrency(value)}</div>
+              </div>
+            );
+        };
+
+        const QuickServiceCard = ({ srvObj, onAdd, colorTheme = 'blue' }) => {
             const [qty, setQty] = useState(1);
             const [customPrice, setCustomPrice] = useState(srvObj.price || 0);
 
@@ -672,10 +375,183 @@
                 </div>
               </div>
             );
-          };
+        };
 
-          // --- TransactionCard (Shared Component) ---
-          const TransactionCard = ({ txn, onDelete, onEdit, onPayRemaining, onViewReceipt, sendInvoice, updateStatus, onViewDetails }) => {
+        const ServicesSettingsList = ({title, items, onAdd, onRemove, colorTheme = 'blue'}) => {
+            const [newName, setNewName] = useState('');
+            const [newPrice, setNewPrice] = useState('');
+            const [newDesc, setNewDesc] = useState('');
+            
+            const handleEditClick = (item, idx) => {
+                const obj = typeof item === 'string' ? {name: item, price: 0, desc: ''} : item;
+                setNewName(obj.name);
+                setNewPrice(obj.price);
+                setNewDesc(obj.desc);
+                onRemove(idx); 
+            };
+
+            const isBlue = colorTheme === 'blue';
+            const colorClass = isBlue ? 'focus:border-blue-500' : 'focus:border-purple-500';
+            const btnClass = isBlue ? 'bg-blue-600 hover:bg-blue-500' : 'bg-purple-600 hover:bg-purple-500';
+            const textClass = isBlue ? 'text-blue-400' : 'text-purple-400';
+
+            return (
+              <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
+                <h3 className="font-bold text-slate-100 mb-4 border-b border-slate-800 pb-2">{title}</h3>
+                <div className="flex flex-col gap-3 mb-5">
+                  <div className="flex gap-2">
+                    <input type="text" value={newName} onChange={e=>setNewName(e.target.value)} className={`flex-1 p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none ${colorClass} placeholder-slate-500 text-sm`} placeholder="الاسم..."/>
+                    <input type="number" value={newPrice} onChange={e=>setNewPrice(e.target.value)} className={`w-24 p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none ${colorClass} placeholder-slate-500 text-sm`} placeholder="السعر..."/>
+                  </div>
+                  <div className="flex gap-2">
+                    <input type="text" value={newDesc} onChange={e=>setNewDesc(e.target.value)} className={`flex-1 p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none ${colorClass} placeholder-slate-500 text-sm`} placeholder="تفاصيل صغيرة (اختياري)..."/>
+                    <button onClick={()=>{if(newName){onAdd({name:newName, price:parseFloat(newPrice)||0, desc:newDesc});setNewName('');setNewPrice('');setNewDesc('');}}} className={`${btnClass} text-white px-5 rounded-lg transition-colors flex items-center justify-center`}><i className="ph ph-plus text-xl"></i></button>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2 overflow-y-auto max-h-[300px] custom-scrollbar pr-2">
+                  {items.map((item, idx) => {
+                    const srv = typeof item === 'string' ? {name: item, price: 0, desc: ''} : item;
+                    return (
+                    <div key={idx} className="bg-slate-800 p-3 rounded-xl flex justify-between items-start border border-slate-700">
+                      <div className="flex flex-col">
+                        <span className="text-slate-300 text-sm font-bold flex items-center gap-2">
+                          {srv.name} {srv.price > 0 && <span className={`text-[10px] bg-slate-950 px-1.5 py-0.5 rounded ${textClass}`}>{srv.price} ج.م</span>}
+                        </span>
+                        {srv.desc && <span className="text-xs text-slate-500 mt-1">{srv.desc}</span>}
+                      </div>
+                      <div className="flex items-center">
+                          <button onClick={()=>handleEditClick(item, idx)} className="text-blue-400 hover:text-blue-300 bg-transparent rounded-full mr-2"><i className="ph ph-pencil-simple text-base"></i></button>
+                          <button onClick={()=>onRemove(idx)} className="text-red-400 hover:text-red-300 bg-transparent rounded-full mr-2"><i className="ph ph-x text-base"></i></button>
+                      </div>
+                    </div>
+                  )})}
+                </div>
+              </div>
+            );
+        };
+
+        const PaymentModal = ({ payModal, setPayModal, db }) => {
+            if (!payModal) return null;
+
+            const handleSubmit = async (e) => {
+              e.preventDefault();
+              const amount = parseFloat(e.target.amount.value);
+              const updated = { 
+                  ...payModal, 
+                  paid: payModal.paid + amount, 
+                  electronicPaid: (payModal.electronicPaid || 0) + (payModal.paymentType === 'electronic' ? amount : 0),
+                  remaining: payModal.total - (payModal.paid + amount) 
+              };
+              if (updated.pendingReceipt) delete updated.pendingReceipt;
+              delete updated.paymentType;
+              const targetCol = updated.type === 'wedding' ? 'weddings' : 'transactions';
+              const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
+              await setDoc(doc(db, `artifacts/${appId}/public/data/${targetCol}`, updated.id), updated);
+              setPayModal(null);
+            };
+
+            const displayName = payModal.type === 'wedding' ? `${payModal.groomName || ''} و ${payModal.brideName || ''}`.trim() || 'بدون اسم' : payModal.clientName;
+
+            return (
+              <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="bg-slate-900 p-5 rounded-2xl shadow-xl border border-slate-800 w-full max-w-sm relative">
+                  <button onClick={() => setPayModal(null)} className="absolute top-3 left-3 p-2 text-slate-500 hover:text-red-400"><i className="ph ph-x text-xl"></i></button>
+                  <h3 className="text-xl font-black mb-3 border-b border-slate-800 pb-3 text-center text-slate-100">
+                      {payModal.paymentType === 'electronic' ? 'سداد إلكتروني (إنستاباي/محافظ)' : 'سداد نقدي'}
+                  </h3>
+                  <div className="mb-4 bg-slate-950 p-3 rounded-xl text-center border border-slate-800">
+                    <p className="text-slate-400 text-sm">العميل: <b className="text-white text-base">{displayName}</b></p>
+                    <p className="text-red-400 font-bold mt-1 text-sm">الباقي المستحق: {payModal.remaining} ج.م</p>
+                  </div>
+                  <form onSubmit={handleSubmit} className="space-y-3">
+                    <input type="number" name="amount" required min="1" max={payModal.remaining} defaultValue={payModal.remaining} className="w-full p-3 border border-slate-700 bg-slate-950 text-white rounded-xl text-xl font-black text-center outline-none focus:border-blue-500 shadow-inner"/>
+                    <button type="submit" className={`w-full text-white font-black py-3 rounded-xl shadow-lg transition-all text-base ${payModal.paymentType === 'electronic' ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/20' : 'bg-green-600 hover:bg-green-500 shadow-green-900/20'}`}>تأكيد تحصيل المبلغ</button>
+                  </form>
+                </div>
+              </div>
+            );
+        };
+
+        const TxnDetailsModal = ({ txnDetailsModal, setTxnDetailsModal, setReceiptImageModal }) => {
+            if (!txnDetailsModal) return null;
+            
+            const isWedding = txnDetailsModal.type === 'wedding';
+            const displayName = isWedding ? `${txnDetailsModal.groomName || ''} و ${txnDetailsModal.brideName || ''}`.trim() : txnDetailsModal.clientName;
+            const reqsText = getReqsText(txnDetailsModal);
+
+            return (
+              <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setTxnDetailsModal(null)}>
+                <div className="bg-slate-900 p-6 rounded-3xl shadow-xl border border-slate-800 w-full max-w-lg relative max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={e => e.stopPropagation()}>
+                  <button onClick={() => setTxnDetailsModal(null)} className="absolute top-4 left-4 p-2 text-slate-500 hover:text-red-400 transition-colors"><i className="ph ph-x text-2xl"></i></button>
+                  
+                  <h3 className="text-2xl font-black mb-6 border-b border-slate-800 pb-4 text-slate-100 flex items-center gap-2">
+                    {isWedding ? <i className="ph ph-heart text-pink-500"></i> : <i className="ph ph-files text-blue-500"></i>}
+                    تفاصيل {isWedding ? 'حجز زفاف' : 'الإيصال'} #{txnDetailsModal.receiptNo}
+                  </h3>
+
+                  <div className="space-y-5">
+                    <div className="flex justify-between items-center bg-slate-950 p-4 rounded-xl border border-slate-800">
+                       <div>
+                          <p className="text-slate-500 text-xs mb-1">الاسم</p>
+                          <p className="font-bold text-lg text-slate-100">{displayName}</p>
+                       </div>
+                       <div className="text-left">
+                          <p className="text-slate-500 text-xs mb-1">رقم الهاتف</p>
+                          <p className="font-mono text-slate-300">{txnDetailsModal.phone}</p>
+                       </div>
+                    </div>
+
+                    {isWedding && (
+                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 grid grid-cols-2 gap-4">
+                            <div><p className="text-slate-500 text-xs mb-1">موعد الزفاف</p><p className="font-bold text-slate-200">{formatDateOnly(txnDetailsModal.weddingDate)}</p></div>
+                            <div><p className="text-slate-500 text-xs mb-1">اللوكيشن</p><p className="font-bold text-slate-200">{txnDetailsModal.location}</p></div>
+                            <div><p className="text-slate-500 text-xs mb-1">الميك أب</p><p className="font-bold text-slate-200">{txnDetailsModal.makeupArtist}</p></div>
+                            <div><p className="text-slate-500 text-xs mb-1">وقت الخروج</p><p className="font-bold text-slate-200">{txnDetailsModal.leaveTime}</p></div>
+                            <div className="col-span-2 border-t border-slate-800 pt-3 mt-1"><p className="text-slate-500 text-xs mb-1">العنوان</p><p className="font-bold text-slate-200">{txnDetailsModal.groomAddress}</p></div>
+                        </div>
+                    )}
+
+                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                       <p className="text-slate-500 text-xs mb-2">المطلوب (الخدمات والمنتجات)</p>
+                       <p className="text-slate-200 leading-relaxed font-medium whitespace-pre-wrap">{reqsText}</p>
+                    </div>
+
+                    {txnDetailsModal.photoNo && (
+                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex justify-between items-center">
+                           <span className="text-slate-500 text-sm">رقم الصورة:</span>
+                           <span className="font-bold text-slate-200">{txnDetailsModal.photoNo}</span>
+                        </div>
+                    )}
+
+                    <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 grid grid-cols-2 gap-4 relative overflow-hidden">
+                       <div className={`absolute top-0 right-0 w-1 h-full ${isWedding ? 'bg-pink-500' : 'bg-blue-500'}`}></div>
+                       <div><p className="text-slate-500 text-xs mb-1">الإجمالي</p><p className="font-bold text-slate-100">{txnDetailsModal.total} ج.م</p></div>
+                       <div><p className="text-slate-500 text-xs mb-1">إجمالي المدفوع</p><p className="font-bold text-green-400">{txnDetailsModal.paid} ج.م</p></div>
+                       <div><p className="text-slate-500 text-xs mb-1">الدفع النقدي</p><p className="font-bold text-emerald-400">{(txnDetailsModal.paid || 0) - (txnDetailsModal.electronicPaid || 0)} ج.م</p></div>
+                       <div><p className="text-slate-500 text-xs mb-1">الدفع الإلكتروني</p><p className="font-bold text-indigo-400">{txnDetailsModal.electronicPaid || 0} ج.م</p></div>
+                       <div className="col-span-2 pt-4 mt-2 border-t border-slate-800 flex justify-between items-center">
+                          <span className="text-slate-400 text-sm">الباقي المستحق:</span>
+                          <span className={`font-black text-xl ${txnDetailsModal.remaining > 0 ? 'text-red-400' : 'text-green-400'}`}>{txnDetailsModal.remaining} ج.م</span>
+                       </div>
+                    </div>
+
+                    {txnDetailsModal.pendingReceipt && (
+                        <div className="bg-indigo-950/20 p-4 rounded-xl border border-indigo-500/30">
+                           <p className="text-indigo-300 text-sm font-bold mb-3 flex items-center gap-2">
+                               <i className="ph ph-image text-lg"></i> صورة التحويل الإلكتروني المرفقة
+                           </p>
+                           <img src={txnDetailsModal.pendingReceipt} alt="Receipt" className="w-full rounded-lg border border-indigo-500/50 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setReceiptImageModal(txnDetailsModal.pendingReceipt)} />
+                        </div>
+                    )}
+                    
+                    <div className="text-xs text-slate-500 text-center mt-4">تاريخ التسجيل: {formatDate(txnDetailsModal.dateTime)}</div>
+                  </div>
+                </div>
+              </div>
+            );
+        };
+
+        const TransactionCard = ({ txn, onDelete, onEdit, onPayRemaining, onViewReceipt, sendInvoice, updateStatus, onViewDetails, settings }) => {
             const [showWaMenu, setShowWaMenu] = useState(false);
             const [confirmDelete, setConfirmDelete] = useState(false);
             const [actionError, setActionError] = useState('');
@@ -685,7 +561,8 @@
             const isWedding = txn.type === 'wedding';
             const displayName = isWedding ? `${txn.groomName || ''} و ${txn.brideName || ''}`.trim() : txn.clientName;
 
-            const handleAddToCalendar = () => {
+            const handleAddToCalendar = (e) => {
+                e.stopPropagation();
                 const success = addToCalendar(txn);
                 if (!success) {
                     setActionError('يجب تحديد موعد الزفاف أولاً لإضافته للتقويم.');
@@ -700,7 +577,7 @@
                       <div className="flex justify-between items-start">
                         <h3 className={`text-lg font-bold flex items-center gap-2 transition-colors ${isWedding ? 'text-pink-100 group-hover:text-pink-400' : 'text-slate-100 group-hover:text-blue-400'}`}>
                            {isWedding ? <i className="ph ph-heart text-pink-500 text-2xl group-hover:text-pink-400"></i> : <i className="ph ph-user-circle text-slate-500 text-2xl group-hover:text-blue-500"></i>}
-                           {displayName}
+                           {displayName || 'عميل بدون اسم'}
                         </h3>
                         <div className="flex items-center gap-2">
                            {txn.viewedByClient ? (
@@ -716,7 +593,7 @@
                         </div>
                       </div>
                       <div className="text-sm text-slate-400 flex flex-wrap gap-x-4">
-                        <span>📞 {txn.phone}</span>
+                        {txn.phone && <span>📞 {txn.phone}</span>}
                         <span>⏱️ {formatDate(txn.dateTime)}</span>
                         {isWedding && txn.weddingDate && <span className="text-pink-400">💍 {formatDateOnly(txn.weddingDate)}</span>}
                       </div>
@@ -777,33 +654,33 @@
                     </button>
                   )}
 
-                  <button onClick={sendInvoice} className="w-full bg-blue-600 hover:bg-blue-500 text-white px-3 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-sm">
+                  <button onClick={(e) => { e.stopPropagation(); sendInvoice(); }} className="w-full bg-blue-600 hover:bg-blue-500 text-white px-3 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-sm">
                     <i className="ph ph-receipt text-xl"></i> إرسال الفاتورة
                   </button>
                   
                   <div className="relative w-full">
-                    <button onClick={() => setShowWaMenu(!showWaMenu)} className="w-full bg-green-600 hover:bg-green-500 text-white px-3 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all">
+                    <button onClick={(e) => { e.stopPropagation(); setShowWaMenu(!showWaMenu); }} className="w-full bg-green-600 hover:bg-green-500 text-white px-3 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all">
                       <i className="ph ph-whatsapp-logo text-xl"></i> رسائل واتساب
                     </button>
                     {showWaMenu && (
                       <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-10 p-1 flex flex-col overflow-hidden">
-                        <button onClick={() => {openWhatsApp(txn.phone, generateWA_Message('tracking', txn, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2.5 text-sm text-blue-300 hover:bg-slate-700 font-bold border-b border-slate-700">📍 رابط التتبع للعميل</button>
-                        <button onClick={() => {openWhatsApp(txn.phone, generateWA_Message('welcome', txn, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-slate-200 hover:bg-slate-700">👋 رسالة ترحيب</button>
-                        <button onClick={() => {openWhatsApp(txn.phone, generateWA_Message('ready', txn, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-slate-200 hover:bg-slate-700">🎉 الشغل خلص</button>
-                        <button onClick={() => {openWhatsApp(txn.phone, generateWA_Message('reminder', txn, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-slate-200 hover:bg-slate-700">⚠️ تذكير بالباقي</button>
+                        <button onClick={(e) => { e.stopPropagation(); openWhatsApp(txn.phone, generateWA_Message('tracking', txn, settings, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2.5 text-sm text-blue-300 hover:bg-slate-700 font-bold border-b border-slate-700">📍 رابط التتبع للعميل</button>
+                        <button onClick={(e) => { e.stopPropagation(); openWhatsApp(txn.phone, generateWA_Message('welcome', txn, settings, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-slate-200 hover:bg-slate-700">👋 رسالة ترحيب</button>
+                        <button onClick={(e) => { e.stopPropagation(); openWhatsApp(txn.phone, generateWA_Message('ready', txn, settings, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-slate-200 hover:bg-slate-700">🎉 الشغل خلص</button>
+                        <button onClick={(e) => { e.stopPropagation(); openWhatsApp(txn.phone, generateWA_Message('reminder', txn, settings, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-slate-200 hover:bg-slate-700">⚠️ تذكير بالباقي</button>
                       </div>
                     )}
                   </div>
 
                   {txn.remaining > 0 && (
                       <div className="flex gap-2 w-full mt-2">
-                        <button onClick={() => onPayRemaining({...txn, paymentType: 'cash'})} className="flex-1 bg-yellow-500 hover:bg-yellow-400 text-slate-900 px-2 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all shadow-sm"><i className="ph ph-money text-lg"></i> نقدي</button>
-                        <button onClick={() => onPayRemaining({...txn, paymentType: 'electronic'})} className="flex-1 bg-indigo-500 hover:bg-indigo-400 text-white px-2 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all shadow-sm"><i className="ph ph-wallet text-lg"></i> إلكتروني</button>
+                        <button onClick={(e) => { e.stopPropagation(); onPayRemaining({...txn, paymentType: 'cash'}); }} className="flex-1 bg-yellow-500 hover:bg-yellow-400 text-slate-900 px-2 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all shadow-sm"><i className="ph ph-money text-lg"></i> نقدي</button>
+                        <button onClick={(e) => { e.stopPropagation(); onPayRemaining({...txn, paymentType: 'electronic'}); }} className="flex-1 bg-indigo-500 hover:bg-indigo-400 text-white px-2 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all shadow-sm"><i className="ph ph-wallet text-lg"></i> إلكتروني</button>
                       </div>
                   )}
 
                   {onEdit && (
-                    <button onClick={() => onEdit(txn)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all mt-2">
+                    <button onClick={(e) => { e.stopPropagation(); onEdit(txn); }} className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all mt-2">
                         <i className="ph ph-pencil-simple text-xl"></i> تعديل البيانات
                     </button>
                   )}
@@ -812,20 +689,19 @@
                       <div className="flex flex-col gap-2 mt-auto pt-2">
                          <span className="text-xs text-red-400 text-center font-bold">تأكيد الحذف نهائياً؟</span>
                          <div className="flex gap-2">
-                            <button onClick={() => onDelete(txn.id)} className="flex-1 bg-red-600 hover:bg-red-500 text-white px-2 py-2 rounded-xl text-xs font-bold transition-all">نعم</button>
-                            <button onClick={() => setConfirmDelete(false)} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white px-2 py-2 rounded-xl text-xs font-bold transition-all">إلغاء</button>
+                            <button onClick={(e) => { e.stopPropagation(); onDelete(txn.id); }} className="flex-1 bg-red-600 hover:bg-red-500 text-white px-2 py-2 rounded-xl text-xs font-bold transition-all">نعم</button>
+                            <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(false); }} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white px-2 py-2 rounded-xl text-xs font-bold transition-all">إلغاء</button>
                          </div>
                       </div>
                   ) : (
-                      <button onClick={() => setConfirmDelete(true)} className="bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-900/30 px-3 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all mt-auto"><i className="ph ph-trash text-xl"></i> حذف الإيصال</button>
+                      <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }} className="bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-900/30 px-3 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all mt-auto"><i className="ph ph-trash text-xl"></i> حذف الإيصال</button>
                   )}
                 </div>
               </div>
             );
-          };
+        };
 
-          // --- Dashboard Tab (Main) ---
-          const DashboardTab = () => {
+        const DashboardTab = ({ settings, setSettings, transactions, inventory, db }) => {
             const [showAddModal, setShowAddModal] = useState(false);
             const [isEditing, setIsEditing] = useState(false);
             const [formData, setFormData] = useState({ clientName: '', phone: '', photoNo: '', requirements: '', total: '', paid: '', paymentMethod: 'cash', soldProducts: [] });
@@ -889,7 +765,7 @@
                 year: isEditing ? formData.year : new Date().getFullYear()
               };
               
-              const appId = 'studio-marakby';
+              const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
               await setDoc(doc(db, `artifacts/${appId}/public/data/transactions`, newTxn.id), newTxn);
 
               if (!isEditing && formData.soldProducts && formData.soldProducts.length > 0) {
@@ -903,7 +779,6 @@
                     }
                  });
                  if (invChanged) {
-                    setInventory(newInv);
                     await setDoc(doc(db, `artifacts/${appId}/public/data/inventory`, 'main'), newInv);
                  }
               }
@@ -915,14 +790,16 @@
             };
 
             const handleDelete = async (id) => {
-              await deleteDoc(doc(db, `artifacts/studio-marakby/public/data/transactions`, id));
+              const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
+              await deleteDoc(doc(db, `artifacts/${appId}/public/data/transactions`, id));
             };
 
             const updateTxnStatus = async (txnId, newStatus) => {
                 const txnToUpdate = transactions.find(t => t.id === txnId);
                 if(txnToUpdate) {
                     const updated = {...txnToUpdate, status: newStatus};
-                    await setDoc(doc(db, `artifacts/studio-marakby/public/data/transactions`, updated.id), updated);
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
+                    await setDoc(doc(db, `artifacts/${appId}/public/data/transactions`, updated.id), updated);
                 }
             };
 
@@ -944,7 +821,7 @@
                 {query && (
                   <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800 space-y-4">
                     <h3 className="text-lg font-bold text-slate-300 border-b border-slate-800 pb-2">نتائج البحث ({filteredTxns.length})</h3>
-                    {filteredTxns.map(txn => <TransactionCard key={txn.id} txn={txn} onDelete={handleDelete} onEdit={handleEdit} onPayRemaining={setPayModal} onViewReceipt={setReceiptImageModal} sendInvoice={() => openWhatsApp(txn.phone, generateWA_Message('invoice', txn))} updateStatus={updateTxnStatus} onViewDetails={setTxnDetailsModal} />)}
+                    {filteredTxns.map(txn => <TransactionCard key={txn.id} txn={txn} onDelete={handleDelete} onEdit={handleEdit} onPayRemaining={setPayModal} onViewReceipt={setReceiptImageModal} sendInvoice={() => openWhatsApp(txn.phone, generateWA_Message('invoice', txn, settings))} updateStatus={updateTxnStatus} onViewDetails={setTxnDetailsModal} settings={settings} />)}
                   </div>
                 )}
 
@@ -954,7 +831,7 @@
                       <i className="ph ph-files text-blue-400 text-2xl"></i> عمليات اليوم ({todaysTxns.length})
                     </h2>
                     <div className="space-y-4">
-                      {todaysTxns.length === 0 ? <p className="text-center p-10 text-slate-500">لا توجد عمليات مسجلة اليوم.</p> : todaysTxns.map(txn => <TransactionCard key={txn.id} txn={txn} onDelete={handleDelete} onEdit={handleEdit} onPayRemaining={setPayModal} onViewReceipt={setReceiptImageModal} sendInvoice={() => openWhatsApp(txn.phone, generateWA_Message('invoice', txn))} updateStatus={updateTxnStatus} onViewDetails={setTxnDetailsModal} />)}
+                      {todaysTxns.length === 0 ? <p className="text-center p-10 text-slate-500">لا توجد عمليات مسجلة اليوم.</p> : todaysTxns.map(txn => <TransactionCard key={txn.id} txn={txn} onDelete={handleDelete} onEdit={handleEdit} onPayRemaining={setPayModal} onViewReceipt={setReceiptImageModal} sendInvoice={() => openWhatsApp(txn.phone, generateWA_Message('invoice', txn, settings))} updateStatus={updateTxnStatus} onViewDetails={setTxnDetailsModal} settings={settings} />)}
                     </div>
                   </div>
                 )}
@@ -1015,129 +892,13 @@
                   </div>
                 )}
                 
-                {payModal && (
-                  <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-slate-900 p-5 rounded-2xl shadow-xl border border-slate-800 w-full max-w-sm relative">
-                      <button onClick={() => setPayModal(null)} className="absolute top-3 left-3 p-2 text-slate-500 hover:text-red-400"><i className="ph ph-x text-xl"></i></button>
-                      <h3 className="text-xl font-black mb-3 border-b border-slate-800 pb-3 text-center text-slate-100">
-                          {payModal.paymentType === 'electronic' ? 'سداد إلكتروني (إنستاباي/محافظ)' : 'سداد نقدي'}
-                      </h3>
-                      <div className="mb-4 bg-slate-950 p-3 rounded-xl text-center border border-slate-800">
-                        <p className="text-slate-400 text-sm">العميل: <b className="text-white text-base">{payModal.type === 'wedding' ? payModal.groomName : payModal.clientName}</b></p>
-                        <p className="text-red-400 font-bold mt-1 text-sm">الباقي المستحق: {payModal.remaining} ج.م</p>
-                      </div>
-                      <form onSubmit={async (e) => {
-                        e.preventDefault();
-                        const amount = parseFloat(e.target.amount.value);
-                        const updated = { 
-                            ...payModal, 
-                            paid: payModal.paid + amount, 
-                            electronicPaid: (payModal.electronicPaid || 0) + (payModal.paymentType === 'electronic' ? amount : 0),
-                            remaining: payModal.total - (payModal.paid + amount) 
-                        };
-                        if (updated.pendingReceipt) delete updated.pendingReceipt;
-                        delete updated.paymentType;
-                        const targetCol = updated.type === 'wedding' ? 'weddings' : 'transactions';
-                        await setDoc(doc(db, `artifacts/studio-marakby/public/data/${targetCol}`, updated.id), updated);
-                        setPayModal(null);
-                      }} className="space-y-3">
-                        <input type="number" name="amount" required min="1" max={payModal.remaining} defaultValue={payModal.remaining} className="w-full p-3 border border-slate-700 bg-slate-950 text-white rounded-xl text-xl font-black text-center outline-none focus:border-blue-500 shadow-inner"/>
-                        <button type="submit" className={`w-full text-white font-black py-3 rounded-xl shadow-lg transition-all text-base ${payModal.paymentType === 'electronic' ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/20' : 'bg-green-600 hover:bg-green-500 shadow-green-900/20'}`}>تأكيد تحصيل المبلغ</button>
-                      </form>
-                    </div>
-                  </div>
-                )}
-                
-                {receiptImageModal && (
-                  <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-                    <div className="relative max-w-2xl w-full flex flex-col items-center">
-                      <button onClick={() => setReceiptImageModal(null)} className="absolute -top-14 right-0 p-2 text-white hover:text-red-400 bg-slate-800 rounded-full shadow-lg border border-slate-700 transition-colors"><i className="ph ph-x text-2xl"></i></button>
-                      <img src={receiptImageModal} alt="إيصال تحويل" className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl border border-slate-700 object-contain bg-slate-900" />
-                    </div>
-                  </div>
-                )}
-
-                {txnDetailsModal && (
-                  <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setTxnDetailsModal(null)}>
-                    <div className="bg-slate-900 p-6 rounded-3xl shadow-xl border border-slate-800 w-full max-w-lg relative max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={e => e.stopPropagation()}>
-                      <button onClick={() => setTxnDetailsModal(null)} className="absolute top-4 left-4 p-2 text-slate-500 hover:text-red-400 transition-colors"><i className="ph ph-x text-2xl"></i></button>
-                      
-                      <h3 className="text-2xl font-black mb-6 border-b border-slate-800 pb-4 text-slate-100 flex items-center gap-2">
-                        {txnDetailsModal.type === 'wedding' ? <i className="ph ph-heart text-pink-500"></i> : <i className="ph ph-files text-blue-500"></i>}
-                        تفاصيل {txnDetailsModal.type === 'wedding' ? 'حجز زفاف' : 'الإيصال'} #{txnDetailsModal.receiptNo}
-                      </h3>
-
-                      <div className="space-y-5">
-                        <div className="flex justify-between items-center bg-slate-950 p-4 rounded-xl border border-slate-800">
-                           <div>
-                              <p className="text-slate-500 text-xs mb-1">الاسم</p>
-                              <p className="font-bold text-lg text-slate-100">
-                                {txnDetailsModal.type === 'wedding' ? `${txnDetailsModal.groomName} و ${txnDetailsModal.brideName}` : txnDetailsModal.clientName}
-                              </p>
-                           </div>
-                           <div className="text-left">
-                              <p className="text-slate-500 text-xs mb-1">رقم الهاتف</p>
-                              <p className="font-mono text-slate-300">{txnDetailsModal.phone}</p>
-                           </div>
-                        </div>
-
-                        {txnDetailsModal.type === 'wedding' && (
-                            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 grid grid-cols-2 gap-4">
-                                <div><p className="text-slate-500 text-xs mb-1">موعد الزفاف</p><p className="font-bold text-slate-200">{formatDateOnly(txnDetailsModal.weddingDate)}</p></div>
-                                <div><p className="text-slate-500 text-xs mb-1">اللوكيشن</p><p className="font-bold text-slate-200">{txnDetailsModal.location}</p></div>
-                                <div><p className="text-slate-500 text-xs mb-1">الميك أب</p><p className="font-bold text-slate-200">{txnDetailsModal.makeupArtist}</p></div>
-                                <div><p className="text-slate-500 text-xs mb-1">وقت الخروج</p><p className="font-bold text-slate-200">{txnDetailsModal.leaveTime}</p></div>
-                                <div className="col-span-2 border-t border-slate-800 pt-3 mt-1"><p className="text-slate-500 text-xs mb-1">العنوان</p><p className="font-bold text-slate-200">{txnDetailsModal.groomAddress}</p></div>
-                            </div>
-                        )}
-
-                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                           <p className="text-slate-500 text-xs mb-2">المطلوب (الخدمات والمنتجات)</p>
-                           <p className="text-slate-200 leading-relaxed font-medium whitespace-pre-wrap">
-                               {txnDetailsModal.type === 'wedding' 
-                                   ? `الباقات: ${txnDetailsModal.packages?.length > 0 ? txnDetailsModal.packages.map(p=>p.name).join(' + ') : (txnDetailsModal.package ? txnDetailsModal.package.name : 'بدون')}\nالسيشن: ${txnDetailsModal.sessionType}\nالكاجوال: ${txnDetailsModal.casualShootDate ? formatDateOnly(txnDetailsModal.casualShootDate) : 'بدون'}\nإضافات: ${txnDetailsModal.addons?.length > 0 ? txnDetailsModal.addons.map(a=>`${a.name}${a.notes ? ' ('+a.notes+')' : ''}`).join(' + ') : 'بدون'}`
-                                   : txnDetailsModal.requirements}
-                           </p>
-                        </div>
-
-                        {txnDetailsModal.photoNo && (
-                            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex justify-between items-center">
-                               <span className="text-slate-500 text-sm">رقم الصورة:</span>
-                               <span className="font-bold text-slate-200">{txnDetailsModal.photoNo}</span>
-                            </div>
-                        )}
-
-                        <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 grid grid-cols-2 gap-4 relative overflow-hidden">
-                           <div className={`absolute top-0 right-0 w-1 h-full ${txnDetailsModal.type === 'wedding' ? 'bg-pink-500' : 'bg-blue-500'}`}></div>
-                           <div><p className="text-slate-500 text-xs mb-1">الإجمالي</p><p className="font-bold text-slate-100">{txnDetailsModal.total} ج.م</p></div>
-                           <div><p className="text-slate-500 text-xs mb-1">إجمالي المدفوع</p><p className="font-bold text-green-400">{txnDetailsModal.paid} ج.م</p></div>
-                           <div><p className="text-slate-500 text-xs mb-1">الدفع النقدي</p><p className="font-bold text-emerald-400">{(txnDetailsModal.paid || 0) - (txnDetailsModal.electronicPaid || 0)} ج.م</p></div>
-                           <div><p className="text-slate-500 text-xs mb-1">الدفع الإلكتروني</p><p className="font-bold text-indigo-400">{txnDetailsModal.electronicPaid || 0} ج.م</p></div>
-                           <div className="col-span-2 pt-4 mt-2 border-t border-slate-800 flex justify-between items-center">
-                              <span className="text-slate-400 text-sm">الباقي المستحق:</span>
-                              <span className={`font-black text-xl ${txnDetailsModal.remaining > 0 ? 'text-red-400' : 'text-green-400'}`}>{txnDetailsModal.remaining} ج.م</span>
-                           </div>
-                        </div>
-
-                        {txnDetailsModal.pendingReceipt && (
-                            <div className="bg-indigo-950/20 p-4 rounded-xl border border-indigo-500/30">
-                               <p className="text-indigo-300 text-sm font-bold mb-3 flex items-center gap-2">
-                                   <i className="ph ph-image text-lg"></i> صورة التحويل الإلكتروني المرفقة
-                               </p>
-                               <img src={txnDetailsModal.pendingReceipt} alt="Receipt" className="w-full rounded-lg border border-indigo-500/50 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setReceiptImageModal(txnDetailsModal.pendingReceipt)} />
-                            </div>
-                        )}
-                        
-                        <div className="text-xs text-slate-500 text-center mt-4">تاريخ التسجيل: {formatDate(txnDetailsModal.dateTime)}</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                <PaymentModal payModal={payModal} setPayModal={setPayModal} db={db} />
+                <TxnDetailsModal txnDetailsModal={txnDetailsModal} setTxnDetailsModal={setTxnDetailsModal} setReceiptImageModal={setReceiptImageModal} />
               </div>
             );
-          };
+        };
 
-          const WeddingsTab = () => {
+        const WeddingsTab = ({ settings, setSettings, weddings, inventory, db }) => {
             const [showAddModal, setShowAddModal] = useState(false);
             const [isEditing, setIsEditing] = useState(false);
             const [query, setQuery] = useState('');
@@ -1273,7 +1034,7 @@
                 year: isEditing ? formData.year : new Date().getFullYear()
               };
               
-              const appId = 'studio-marakby';
+              const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
               await setDoc(doc(db, `artifacts/${appId}/public/data/weddings`, newWedding.id), newWedding);
               
               if(!isEditing) setSettings({...settings, nextReceiptNo: (settings.nextReceiptNo || 1000) + 1});
@@ -1283,18 +1044,20 @@
             };
 
             const handleDelete = async (id) => {
-              await deleteDoc(doc(db, `artifacts/studio-marakby/public/data/weddings`, id));
+              const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
+              await deleteDoc(doc(db, `artifacts/${appId}/public/data/weddings`, id));
             };
 
             const updateTxnStatus = async (txnId, newStatus) => {
                 const txnToUpdate = weddings.find(t => t.id === txnId);
                 if(txnToUpdate) {
                     const updated = {...txnToUpdate, status: newStatus};
-                    await setDoc(doc(db, `artifacts/studio-marakby/public/data/weddings`, updated.id), updated);
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
+                    await setDoc(doc(db, `artifacts/${appId}/public/data/weddings`, updated.id), updated);
                 }
             };
 
-            const filteredWeds = query ? weddings.filter(t => t.groomName.includes(query) || t.brideName.includes(query) || t.phone.includes(query) || t.receiptNo.toString().includes(query)) : weddings;
+            const filteredWeds = query ? weddings.filter(t => t.groomName?.includes(query) || t.brideName?.includes(query) || t.phone?.includes(query) || t.receiptNo.toString().includes(query)) : weddings;
 
             return (
               <div className="space-y-6">
@@ -1313,7 +1076,7 @@
                     <i className="ph ph-calendar-heart text-pink-400 text-2xl"></i> حجوزات الزفاف ({filteredWeds.length})
                   </h2>
                   <div className="space-y-4">
-                    {filteredWeds.length === 0 ? <p className="text-center p-10 text-slate-500">لا توجد حجوزات مسجلة.</p> : filteredWeds.map(txn => <TransactionCard key={txn.id} txn={txn} onDelete={handleDelete} onEdit={handleEdit} onPayRemaining={setPayModal} onViewReceipt={setReceiptImageModal} sendInvoice={() => openWhatsApp(txn.phone, generateWA_Message('invoice', txn, true))} updateStatus={updateTxnStatus} onViewDetails={setTxnDetailsModal} />)}
+                    {filteredWeds.length === 0 ? <p className="text-center p-10 text-slate-500">لا توجد حجوزات مسجلة.</p> : filteredWeds.map(txn => <TransactionCard key={txn.id} txn={txn} onDelete={handleDelete} onEdit={handleEdit} onPayRemaining={setPayModal} onViewReceipt={setReceiptImageModal} sendInvoice={() => openWhatsApp(txn.phone, generateWA_Message('invoice', txn, settings, true))} updateStatus={updateTxnStatus} onViewDetails={setTxnDetailsModal} settings={settings} />)}
                   </div>
                 </div>
 
@@ -1448,136 +1211,19 @@
                   </div>
                 )}
 
-                {/* Modals for Details and Payment... reused logic */}
-                {payModal && (
-                  <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-slate-900 p-5 rounded-2xl shadow-xl border border-slate-800 w-full max-w-sm relative">
-                      <button onClick={() => setPayModal(null)} className="absolute top-3 left-3 p-2 text-slate-500 hover:text-red-400"><i className="ph ph-x text-xl"></i></button>
-                      <h3 className="text-xl font-black mb-3 border-b border-slate-800 pb-3 text-center text-slate-100">
-                          {payModal.paymentType === 'electronic' ? 'سداد إلكتروني (إنستاباي/محافظ)' : 'سداد نقدي'}
-                      </h3>
-                      <div className="mb-4 bg-slate-950 p-3 rounded-xl text-center border border-slate-800">
-                        <p className="text-slate-400 text-sm">العميل: <b className="text-white text-base">{payModal.type === 'wedding' ? payModal.groomName : payModal.clientName}</b></p>
-                        <p className="text-red-400 font-bold mt-1 text-sm">الباقي المستحق: {payModal.remaining} ج.م</p>
-                      </div>
-                      <form onSubmit={async (e) => {
-                        e.preventDefault();
-                        const amount = parseFloat(e.target.amount.value);
-                        const updated = { 
-                            ...payModal, 
-                            paid: payModal.paid + amount, 
-                            electronicPaid: (payModal.electronicPaid || 0) + (payModal.paymentType === 'electronic' ? amount : 0),
-                            remaining: payModal.total - (payModal.paid + amount) 
-                        };
-                        if (updated.pendingReceipt) delete updated.pendingReceipt;
-                        delete updated.paymentType;
-                        const targetCol = updated.type === 'wedding' ? 'weddings' : 'transactions';
-                        await setDoc(doc(db, `artifacts/studio-marakby/public/data/${targetCol}`, updated.id), updated);
-                        setPayModal(null);
-                      }} className="space-y-3">
-                        <input type="number" name="amount" required min="1" max={payModal.remaining} defaultValue={payModal.remaining} className="w-full p-3 border border-slate-700 bg-slate-950 text-white rounded-xl text-xl font-black text-center outline-none focus:border-blue-500 shadow-inner"/>
-                        <button type="submit" className={`w-full text-white font-black py-3 rounded-xl shadow-lg transition-all text-base ${payModal.paymentType === 'electronic' ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/20' : 'bg-green-600 hover:bg-green-500 shadow-green-900/20'}`}>تأكيد تحصيل المبلغ</button>
-                      </form>
-                    </div>
-                  </div>
-                )}
-                
-                {receiptImageModal && (
-                  <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-                    <div className="relative max-w-2xl w-full flex flex-col items-center">
-                      <button onClick={() => setReceiptImageModal(null)} className="absolute -top-14 right-0 p-2 text-white hover:text-red-400 bg-slate-800 rounded-full shadow-lg border border-slate-700 transition-colors"><i className="ph ph-x text-2xl"></i></button>
-                      <img src={receiptImageModal} alt="إيصال تحويل" className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl border border-slate-700 object-contain bg-slate-900" />
-                    </div>
-                  </div>
-                )}
-
-                {txnDetailsModal && (
-                  <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setTxnDetailsModal(null)}>
-                    <div className="bg-slate-900 p-6 rounded-3xl shadow-xl border border-slate-800 w-full max-w-lg relative max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={e => e.stopPropagation()}>
-                      <button onClick={() => setTxnDetailsModal(null)} className="absolute top-4 left-4 p-2 text-slate-500 hover:text-red-400 transition-colors"><i className="ph ph-x text-2xl"></i></button>
-                      
-                      <h3 className="text-2xl font-black mb-6 border-b border-slate-800 pb-4 text-slate-100 flex items-center gap-2">
-                        {txnDetailsModal.type === 'wedding' ? <i className="ph ph-heart text-pink-500"></i> : <i className="ph ph-files text-blue-500"></i>}
-                        تفاصيل {txnDetailsModal.type === 'wedding' ? 'حجز زفاف' : 'الإيصال'} #{txnDetailsModal.receiptNo}
-                      </h3>
-
-                      <div className="space-y-5">
-                        <div className="flex justify-between items-center bg-slate-950 p-4 rounded-xl border border-slate-800">
-                           <div>
-                              <p className="text-slate-500 text-xs mb-1">الاسم</p>
-                              <p className="font-bold text-lg text-slate-100">
-                                {txnDetailsModal.type === 'wedding' ? `${txnDetailsModal.groomName} و ${txnDetailsModal.brideName}` : txnDetailsModal.clientName}
-                              </p>
-                           </div>
-                           <div className="text-left">
-                              <p className="text-slate-500 text-xs mb-1">رقم الهاتف</p>
-                              <p className="font-mono text-slate-300">{txnDetailsModal.phone}</p>
-                           </div>
-                        </div>
-
-                        {txnDetailsModal.type === 'wedding' && (
-                            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 grid grid-cols-2 gap-4">
-                                <div><p className="text-slate-500 text-xs mb-1">موعد الزفاف</p><p className="font-bold text-slate-200">{formatDateOnly(txnDetailsModal.weddingDate)}</p></div>
-                                <div><p className="text-slate-500 text-xs mb-1">اللوكيشن</p><p className="font-bold text-slate-200">{txnDetailsModal.location}</p></div>
-                                <div><p className="text-slate-500 text-xs mb-1">الميك أب</p><p className="font-bold text-slate-200">{txnDetailsModal.makeupArtist}</p></div>
-                                <div><p className="text-slate-500 text-xs mb-1">وقت الخروج</p><p className="font-bold text-slate-200">{txnDetailsModal.leaveTime}</p></div>
-                                <div className="col-span-2 border-t border-slate-800 pt-3 mt-1"><p className="text-slate-500 text-xs mb-1">العنوان</p><p className="font-bold text-slate-200">{txnDetailsModal.groomAddress}</p></div>
-                            </div>
-                        )}
-
-                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                           <p className="text-slate-500 text-xs mb-2">المطلوب (الخدمات والمنتجات)</p>
-                           <p className="text-slate-200 leading-relaxed font-medium whitespace-pre-wrap">
-                               {txnDetailsModal.type === 'wedding' 
-                                   ? `الباقات: ${txnDetailsModal.packages?.length > 0 ? txnDetailsModal.packages.map(p=>p.name).join(' + ') : (txnDetailsModal.package ? txnDetailsModal.package.name : 'بدون')}\nالسيشن: ${txnDetailsModal.sessionType}\nالكاجوال: ${txnDetailsModal.casualShootDate ? formatDateOnly(txnDetailsModal.casualShootDate) : 'بدون'}\nإضافات: ${txnDetailsModal.addons?.length > 0 ? txnDetailsModal.addons.map(a=>`${a.name}${a.notes ? ' ('+a.notes+')' : ''}`).join(' + ') : 'بدون'}`
-                                   : txnDetailsModal.requirements}
-                           </p>
-                        </div>
-
-                        {txnDetailsModal.photoNo && (
-                            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex justify-between items-center">
-                               <span className="text-slate-500 text-sm">رقم الصورة:</span>
-                               <span className="font-bold text-slate-200">{txnDetailsModal.photoNo}</span>
-                            </div>
-                        )}
-
-                        <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 grid grid-cols-2 gap-4 relative overflow-hidden">
-                           <div className={`absolute top-0 right-0 w-1 h-full ${txnDetailsModal.type === 'wedding' ? 'bg-pink-500' : 'bg-blue-500'}`}></div>
-                           <div><p className="text-slate-500 text-xs mb-1">الإجمالي</p><p className="font-bold text-slate-100">{txnDetailsModal.total} ج.م</p></div>
-                           <div><p className="text-slate-500 text-xs mb-1">إجمالي المدفوع</p><p className="font-bold text-green-400">{txnDetailsModal.paid} ج.م</p></div>
-                           <div><p className="text-slate-500 text-xs mb-1">الدفع النقدي</p><p className="font-bold text-emerald-400">{(txnDetailsModal.paid || 0) - (txnDetailsModal.electronicPaid || 0)} ج.م</p></div>
-                           <div><p className="text-slate-500 text-xs mb-1">الدفع الإلكتروني</p><p className="font-bold text-indigo-400">{txnDetailsModal.electronicPaid || 0} ج.م</p></div>
-                           <div className="col-span-2 pt-4 mt-2 border-t border-slate-800 flex justify-between items-center">
-                              <span className="text-slate-400 text-sm">الباقي المستحق:</span>
-                              <span className={`font-black text-xl ${txnDetailsModal.remaining > 0 ? 'text-red-400' : 'text-green-400'}`}>{txnDetailsModal.remaining} ج.م</span>
-                           </div>
-                        </div>
-
-                        {txnDetailsModal.pendingReceipt && (
-                            <div className="bg-indigo-950/20 p-4 rounded-xl border border-indigo-500/30">
-                               <p className="text-indigo-300 text-sm font-bold mb-3 flex items-center gap-2">
-                                   <i className="ph ph-image text-lg"></i> صورة التحويل الإلكتروني المرفقة
-                               </p>
-                               <img src={txnDetailsModal.pendingReceipt} alt="Receipt" className="w-full rounded-lg border border-indigo-500/50 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setReceiptImageModal(txnDetailsModal.pendingReceipt)} />
-                            </div>
-                        )}
-                        
-                        <div className="text-xs text-slate-500 text-center mt-4">تاريخ التسجيل: {formatDate(txnDetailsModal.dateTime)}</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                <PaymentModal payModal={payModal} setPayModal={setPayModal} db={db} />
+                <TxnDetailsModal txnDetailsModal={txnDetailsModal} setTxnDetailsModal={setTxnDetailsModal} setReceiptImageModal={setReceiptImageModal} />
               </div>
             );
-          };
+        };
 
-          const ExpensesTab = () => {
+        const ExpensesTab = ({ settings, expenses, inventory, db }) => {
             const [expData, setExpData] = useState({ amount: '', category: settings.expenseCategories[0], notes: '' });
             
             const handleAddExpense = async (e) => {
               e.preventDefault();
               const newExp = { id: Date.now().toString(), date: new Date().toISOString(), amount: parseFloat(expData.amount), category: expData.category, notes: expData.notes, month: new Date().getMonth() + 1, year: new Date().getFullYear() };
-              const appId = 'studio-marakby';
+              const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
               await setDoc(doc(db, `artifacts/${appId}/public/data/expenses`, newExp.id), newExp);
               setExpData({ amount: '', category: settings.expenseCategories[0], notes: '' });
             };
@@ -1588,6 +1234,12 @@
                const prods = (settings.products || []).map(p => typeof p === 'string' ? p : p.name);
                return ["ورق طباعة صور", "أحبار طابعة", ...prods];
             }, [settings.products]);
+
+            const updateInventory = async (itemName, change) => {
+               const newInv = { ...inventory, [itemName]: Math.max(0, (inventory[itemName] || 0) + change) };
+               const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
+               await setDoc(doc(db, `artifacts/${appId}/public/data/inventory`, 'main'), newInv);
+            };
 
             return (
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -1625,7 +1277,10 @@
                                {exp.notes && <p className="text-xs text-slate-500 mt-1">{exp.notes}</p>}
                                <p className="text-xs text-slate-600 mt-2 font-mono">{formatDate(exp.date)}</p>
                            </div>
-                           <button onClick={async () => await deleteDoc(doc(db, `artifacts/studio-marakby/public/data/expenses`, exp.id))} className="text-slate-500 hover:text-red-400 p-2"><i className="ph ph-trash text-xl"></i></button>
+                           <button onClick={async () => {
+                               const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
+                               await deleteDoc(doc(db, `artifacts/${appId}/public/data/expenses`, exp.id));
+                           }} className="text-slate-500 hover:text-red-400 p-2"><i className="ph ph-trash text-xl"></i></button>
                          </div>
                        ))}
                      </div>
@@ -1657,13 +1312,12 @@
                 </div>
               </div>
             );
-          };
+        };
 
-          const ReportsTab = () => {
+        const ReportsTab = ({ settings, transactions, weddings, expenses }) => {
             const currentMonth = new Date().getMonth() + 1;
             const currentYear = new Date().getFullYear();
             const [filter, setFilter] = useState({ month: currentMonth, year: currentYear });
-            const [payModal, setPayModal] = useState(null);
             
             const filteredTxns = transactions.filter(t => t.month == filter.month && t.year == filter.year);
             const filteredWeds = weddings.filter(t => t.month == filter.month && t.year == filter.year);
@@ -1728,8 +1382,6 @@
                               <div className="flex items-center gap-1.5 w-full sm:w-auto">
                                 <span className="text-red-400 font-bold text-xs ml-auto sm:ml-2">{txn.remaining} ج.م</span>
                                 <button onClick={() => openWhatsApp(txn.phone, `مرحباً أ. ${txn.clientName} 🌟\nتذكير بمبلغ متبقي لحسابكم في ${settings.studioName} بقيمة ${txn.remaining} ج.م.\nيمكن التحويل فودافون كاش أو إنستاباي على رقم: 01126810107`)} className="bg-green-600 hover:bg-green-500 text-white p-1.5 rounded-lg text-sm transition-colors" title="إرسال تذكير عبر الواتس"><i className="ph ph-whatsapp-logo text-base"></i></button>
-                                <button onClick={() => setPayModal({...txn, paymentType: 'cash'})} className="bg-yellow-500 hover:bg-yellow-400 text-slate-900 p-1.5 rounded-lg text-sm transition-colors" title="سداد نقدي"><i className="ph ph-money text-base"></i></button>
-                                <button onClick={() => setPayModal({...txn, paymentType: 'electronic'})} className="bg-indigo-500 hover:bg-indigo-400 text-white p-1.5 rounded-lg text-sm transition-colors" title="سداد إلكتروني"><i className="ph ph-wallet text-base"></i></button>
                               </div>
                             </div>
                           ))}
@@ -1762,8 +1414,6 @@
                               <div className="flex items-center gap-1.5 w-full sm:w-auto">
                                 <span className="text-red-400 font-bold text-xs ml-auto sm:ml-2">{txn.remaining} ج.م</span>
                                 <button onClick={() => openWhatsApp(txn.phone, `مرحباً العريس ${txn.groomName} 🌟\nتذكير بمبلغ متبقي لحجز الزفاف في ${settings.studioName} بقيمة ${txn.remaining} ج.م.\nيمكن التحويل فودافون كاش أو إنستاباي على رقم: 01126810107`)} className="bg-green-600 hover:bg-green-500 text-white p-1.5 rounded-lg text-sm transition-colors" title="إرسال تذكير عبر الواتس"><i className="ph ph-whatsapp-logo text-base"></i></button>
-                                <button onClick={() => setPayModal({...txn, paymentType: 'cash'})} className="bg-yellow-500 hover:bg-yellow-400 text-slate-900 p-1.5 rounded-lg text-sm transition-colors" title="سداد نقدي"><i className="ph ph-money text-base"></i></button>
-                                <button onClick={() => setPayModal({...txn, paymentType: 'electronic'})} className="bg-indigo-500 hover:bg-indigo-400 text-white p-1.5 rounded-lg text-sm transition-colors" title="سداد إلكتروني"><i className="ph ph-wallet text-base"></i></button>
                               </div>
                             </div>
                           ))}
@@ -1772,61 +1422,11 @@
                     </div>
                   </div>
                 </div>
-
-                {payModal && (
-                   <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-slate-900 p-5 rounded-2xl shadow-xl border border-slate-800 w-full max-w-sm relative">
-                      <button onClick={() => setPayModal(null)} className="absolute top-3 left-3 p-2 text-slate-500 hover:text-red-400"><i className="ph ph-x text-xl"></i></button>
-                      <h3 className="text-xl font-black mb-3 border-b border-slate-800 pb-3 text-center text-slate-100">
-                          {payModal.paymentType === 'electronic' ? 'سداد إلكتروني (إنستاباي/محافظ)' : 'سداد نقدي'}
-                      </h3>
-                      <div className="mb-4 bg-slate-950 p-3 rounded-xl text-center border border-slate-800">
-                        <p className="text-slate-400 text-sm">العميل: <b className="text-white text-base">{payModal.type === 'wedding' ? payModal.groomName : payModal.clientName}</b></p>
-                        <p className="text-red-400 font-bold mt-1 text-sm">الباقي المستحق: {payModal.remaining} ج.م</p>
-                      </div>
-                      <form onSubmit={async (e) => {
-                        e.preventDefault();
-                        const amount = parseFloat(e.target.amount.value);
-                        const updated = { 
-                            ...payModal, 
-                            paid: payModal.paid + amount, 
-                            electronicPaid: (payModal.electronicPaid || 0) + (payModal.paymentType === 'electronic' ? amount : 0),
-                            remaining: payModal.total - (payModal.paid + amount) 
-                        };
-                        if (updated.pendingReceipt) delete updated.pendingReceipt;
-                        delete updated.paymentType;
-                        const targetCol = updated.type === 'wedding' ? 'weddings' : 'transactions';
-                        await setDoc(doc(db, `artifacts/studio-marakby/public/data/${targetCol}`, updated.id), updated);
-                        setPayModal(null);
-                      }} className="space-y-3">
-                        <input type="number" name="amount" required min="1" max={payModal.remaining} defaultValue={payModal.remaining} className="w-full p-3 border border-slate-700 bg-slate-950 text-white rounded-xl text-xl font-black text-center outline-none focus:border-blue-500 shadow-inner"/>
-                        <button type="submit" className={`w-full text-white font-black py-3 rounded-xl shadow-lg transition-all text-base ${payModal.paymentType === 'electronic' ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/20' : 'bg-green-600 hover:bg-green-500 shadow-green-900/20'}`}>تأكيد تحصيل المبلغ</button>
-                      </form>
-                    </div>
-                  </div>
-                )}
               </div>
             );
-          };
+        };
 
-          const StatCard = ({title, value, color, highlight}) => {
-            const colors = { 
-                green: "bg-green-950/30 text-green-400 border-green-900/50", 
-                red: "bg-red-950/30 text-red-400 border-red-900/50", 
-                blue: "bg-blue-950/30 text-blue-400 border-blue-900/50", 
-                indigo: "bg-indigo-950/30 text-indigo-400 border-indigo-900/50",
-                emerald: "bg-emerald-600 text-white border-emerald-500", 
-                rose: "bg-rose-600 text-white border-rose-500" 
-            };
-            return (
-              <div className={`p-3 sm:p-4 rounded-xl border ${colors[color]} ${highlight ? 'shadow-lg scale-105' : ''}`}>
-                <h4 className="text-[11px] sm:text-xs opacity-80 mb-1">{title}</h4>
-                <div className="text-base sm:text-lg font-black">{formatCurrency(value)}</div>
-              </div>
-            );
-          };
-
-          const SettingsTab = () => {
+        const SettingsTab = ({ settings, setSettings }) => {
             const handleAddList = (key, val) => { if(!val) return; setSettings({...settings, [key]: [...settings[key], val]}); };
             const handleRemoveList = (key, idx) => { const newList = [...settings[key]]; newList.splice(idx, 1); setSettings({...settings, [key]: newList}); };
             
@@ -1930,73 +1530,334 @@
             );
           };
 
-          const ServicesSettingsList = ({title, items, onAdd, onRemove, colorTheme = 'blue'}) => {
-            const [newName, setNewName] = useState('');
-            const [newPrice, setNewPrice] = useState('');
-            const [newDesc, setNewDesc] = useState('');
-            
-            const handleEditClick = (item, idx) => {
-                const obj = typeof item === 'string' ? {name: item, price: 0, desc: ''} : item;
-                setNewName(obj.name);
-                setNewPrice(obj.price);
-                setNewDesc(obj.desc);
-                onRemove(idx); 
+        // --- Main App Component ---
+
+        function App() {
+          const [activeTab, setActiveTab] = useState('dashboard');
+          const [user, setUser] = useState(null);
+          const [authReady, setAuthReady] = useState(false);
+          const [authError, setAuthError] = useState(null);
+          const [dataLoaded, setDataLoaded] = useState(false);
+          const [showNotFound, setShowNotFound] = useState(false);
+          const [transferReceipt, setTransferReceipt] = useState(null);
+          const [isUploading, setIsUploading] = useState(false);
+          const [clientViewError, setClientViewError] = useState('');
+          
+          const [transactions, setTransactions] = useState([]);
+          const [weddings, setWeddings] = useState([]);
+          const [expenses, setExpenses] = useState([]);
+          const [inventory, setInventory] = useState({});
+          const [settings, setSettings] = useState({
+            nextReceiptNo: 1000,
+            services: DEFAULT_SERVICES,
+            products: DEFAULT_PRODUCTS,
+            weddingPackages: DEFAULT_WEDDING_PACKAGES,
+            expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
+            waTemplates: DEFAULT_WA_TEMPLATES,
+            studioName: "ستوديو المراكبى",
+            studioLogo: ""
+          });
+
+          const urlParams = new URLSearchParams(window.location.search);
+          const trackPhone = urlParams.get('phone');
+          const trackReceipt = urlParams.get('receipt');
+          const trackType = urlParams.get('type') || 't'; 
+          const isTracking = trackPhone && trackReceipt;
+
+          useEffect(() => {
+            const initAuth = async () => {
+              try { await signInAnonymously(auth); } 
+              catch (error) { setAuthError("تنبيه: يوجد مشكلة في الاتصال بقاعدة البيانات."); setAuthReady(true); }
             };
+            initAuth();
+            const unsubscribe = onAuthStateChanged(auth, (u) => { setUser(u); setAuthReady(true); });
+            return () => unsubscribe();
+          }, []);
 
-            const isBlue = colorTheme === 'blue';
-            const colorClass = isBlue ? 'focus:border-blue-500' : 'focus:border-purple-500';
-            const btnClass = isBlue ? 'bg-blue-600 hover:bg-blue-500' : 'bg-purple-600 hover:bg-purple-500';
-            const textClass = isBlue ? 'text-blue-400' : 'text-purple-400';
+          useEffect(() => {
+            if (!user) return;
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
+            const basePath = `artifacts/${appId}/public/data`;
 
-            return (
-              <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
-                <h3 className="font-bold text-slate-100 mb-4 border-b border-slate-800 pb-2">{title}</h3>
-                <div className="flex flex-col gap-3 mb-5">
-                  <div className="flex gap-2">
-                    <input type="text" value={newName} onChange={e=>setNewName(e.target.value)} className={`flex-1 p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none ${colorClass} placeholder-slate-500 text-sm`} placeholder="الاسم..."/>
-                    <input type="number" value={newPrice} onChange={e=>setNewPrice(e.target.value)} className={`w-24 p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none ${colorClass} placeholder-slate-500 text-sm`} placeholder="السعر..."/>
-                  </div>
-                  <div className="flex gap-2">
-                    <input type="text" value={newDesc} onChange={e=>setNewDesc(e.target.value)} className={`flex-1 p-3 border border-slate-700 bg-slate-950 text-white rounded-lg outline-none ${colorClass} placeholder-slate-500 text-sm`} placeholder="تفاصيل صغيرة (اختياري)..."/>
-                    <button onClick={()=>{if(newName){onAdd({name:newName, price:parseFloat(newPrice)||0, desc:newDesc});setNewName('');setNewPrice('');setNewDesc('');}}} className={`${btnClass} text-white px-5 rounded-lg transition-colors flex items-center justify-center`}><i className="ph ph-plus text-xl"></i></button>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-2 overflow-y-auto max-h-[300px] custom-scrollbar pr-2">
-                  {items.map((item, idx) => {
-                    const srv = typeof item === 'string' ? {name: item, price: 0, desc: ''} : item;
-                    return (
-                    <div key={idx} className="bg-slate-800 p-3 rounded-xl flex justify-between items-start border border-slate-700">
-                      <div className="flex flex-col">
-                        <span className="text-slate-300 text-sm font-bold flex items-center gap-2">
-                          {srv.name} {srv.price > 0 && <span className={`text-[10px] bg-slate-950 px-1.5 py-0.5 rounded ${textClass}`}>{srv.price} ج.م</span>}
-                        </span>
-                        {srv.desc && <span className="text-xs text-slate-500 mt-1">{srv.desc}</span>}
+            const fetchSettings = async () => {
+              const docSnap = await getDoc(doc(db, basePath, 'settings', 'main'));
+              if (docSnap.exists()) {
+                let data = docSnap.data();
+                if (data.services) data.services = data.services.map(s => typeof s === 'string' ? { name: s, price: 0, desc: '' } : { name: s.name, price: s.price || 0, desc: s.desc || '' });
+                if (!data.products) data.products = DEFAULT_PRODUCTS;
+                else data.products = data.products.map(p => typeof p === 'string' ? { name: p, price: 0, desc: '' } : { name: p.name, price: p.price || 0, desc: p.desc || '' });
+                if (!data.weddingPackages) data.weddingPackages = DEFAULT_WEDDING_PACKAGES;
+                
+                if (!data.expenseCategories || data.expenseCategories.length < 5) data.expenseCategories = DEFAULT_EXPENSE_CATEGORIES;
+
+                if(!data.waTemplates) data.waTemplates = DEFAULT_WA_TEMPLATES;
+                if (data.waTemplates.invoice && !data.waTemplates.invoice.includes('{track_url}')) {
+                    data.waTemplates.invoice = DEFAULT_WA_TEMPLATES.invoice;
+                }
+
+                setSettings(data);
+              }
+            };
+            fetchSettings();
+
+            const unsubInv = onSnapshot(doc(db, basePath, 'inventory', 'main'), (docSnap) => {
+              if (docSnap.exists()) setInventory(docSnap.data());
+            }, (err) => console.error(err));
+
+            const unsubTxns = onSnapshot(collection(db, basePath, 'transactions'), (snapshot) => {
+              const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+              data.sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
+              setTransactions(data);
+              if(trackType !== 'w') setDataLoaded(true);
+            });
+
+            const unsubWeds = onSnapshot(collection(db, basePath, 'weddings'), (snapshot) => {
+              const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+              data.sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
+              setWeddings(data);
+              if(trackType === 'w') setDataLoaded(true);
+            });
+
+            if(!isTracking) {
+                const unsubExps = onSnapshot(collection(db, basePath, 'expenses'), (snapshot) => {
+                  const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                  data.sort((a, b) => new Date(b.date) - new Date(a.date));
+                  setExpenses(data);
+                });
+                return () => { unsubTxns(); unsubWeds(); unsubExps(); unsubInv(); };
+            }
+
+            return () => { unsubTxns(); unsubWeds(); unsubInv(); };
+          }, [user, isTracking, trackType]);
+
+          useEffect(() => {
+            if (!user || isTracking) return; 
+            const timer = setTimeout(() => {
+              const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
+              setDoc(doc(db, `artifacts/${appId}/public/data/settings`, 'main'), settings);
+            }, 1500);
+            return () => clearTimeout(timer);
+          }, [settings, user, isTracking]);
+
+          // Client View Tracking & Recording
+          useEffect(() => {
+              if (isTracking && dataLoaded) {
+                  const targetArr = trackType === 'w' ? weddings : transactions;
+                  const currentTxn = targetArr.find(t => t.phone === trackPhone && t.receiptNo.toString() === trackReceipt);
+                  
+                  if (!currentTxn) {
+                      const timer = setTimeout(() => setShowNotFound(true), 2500);
+                      return () => clearTimeout(timer);
+                  } else {
+                      setShowNotFound(false);
+                      if (!currentTxn.viewedByClient) {
+                          const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
+                          const targetCol = trackType === 'w' ? 'weddings' : 'transactions';
+                          const updated = { ...currentTxn, viewedByClient: true, viewTime: new Date().toISOString() };
+                          setDoc(doc(db, `artifacts/${appId}/public/data/${targetCol}`, currentTxn.id), updated).catch(err => console.error(err));
+                      }
+                  }
+              }
+          }, [isTracking, dataLoaded, transactions, weddings, trackPhone, trackReceipt, trackType]);
+
+          // --- Client Tracking Render ---
+          if (isTracking && authReady) {
+              const targetArr = trackType === 'w' ? weddings : transactions;
+              const txn = targetArr.find(t => t.phone === trackPhone && t.receiptNo.toString() === trackReceipt);
+
+              if (!dataLoaded || (!txn && !showNotFound)) {
+                  return (
+                      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-100 p-6 text-center">
+                          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                          <h2 className="text-xl font-bold mb-2 text-white">جاري البحث عن الطلب...</h2>
+                          <p className="text-slate-400 text-sm">لحظات ونعرض لك التفاصيل</p>
                       </div>
-                      <div className="flex items-center">
-                          <button onClick={()=>handleEditClick(item, idx)} className="text-blue-400 hover:text-blue-300 bg-transparent rounded-full mr-2"><i className="ph ph-pencil-simple text-base"></i></button>
-                          <button onClick={()=>onRemove(idx)} className="text-red-400 hover:text-red-300 bg-transparent rounded-full mr-2"><i className="ph ph-x text-base"></i></button>
+                  );
+              }
+              
+              if (!txn && showNotFound) {
+                  return (
+                      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 p-6 text-center">
+                          <i className="ph ph-magnifying-glass text-6xl mb-4 text-slate-600"></i>
+                          <h2 className="text-2xl font-bold mb-2 text-white">الطلب غير موجود</h2>
+                          <p>عذراً، لم نتمكن من العثور على طلب يطابق رقم الهاتف والإيصال المدخلين.</p>
+                          <p className="mt-2 text-sm opacity-70">رقم الهاتف: {trackPhone} | رقم الإيصال: {trackReceipt}</p>
                       </div>
-                    </div>
-                  )})}
-                </div>
-              </div>
-            );
-          };
+                  );
+              }
+              
+              const currentStatus = txn.status || 0;
+              const isWedding = trackType === 'w';
+              const displayName = isWedding ? `${txn.groomName || ''} و ${txn.brideName || ''}`.trim() : txn.clientName;
+              const displayReqs = getReqsText(txn);
 
-          if (!authReady) return <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-100"><div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div><p className="font-bold">جاري المزامنة مع السحابة...</p></div>;
+              return (
+                  <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-6 flex flex-col items-center">
+                      <div className="flex flex-col items-center gap-3 mb-8 mt-6">
+                          {settings.studioLogo ? <img src={settings.studioLogo} className="w-24 h-24 rounded-2xl object-cover shadow-lg shadow-blue-900/20 border border-slate-800" /> : <i className="ph ph-camera text-6xl text-blue-500"></i>}
+                          <h1 className="text-2xl font-black">{settings.studioName}</h1>
+                          <p className="text-slate-400 text-sm">{isWedding ? 'تتبع حجز الزفاف الخاص بك 💍' : 'تتبع حالة الطلب الخاص بك'}</p>
+                      </div>
+
+                      <div className="bg-slate-900 w-full max-w-md p-6 rounded-3xl shadow-xl border border-slate-800 mb-8 relative overflow-hidden">
+                          <div className={`absolute top-0 right-0 w-2 h-full ${isWedding ? 'bg-pink-500' : 'bg-blue-500'}`}></div>
+                          <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-800">
+                              <span className="text-slate-400 text-sm">إيصال رقم</span>
+                              <span className="text-2xl font-black font-mono text-white">#{txn.receiptNo}</span>
+                          </div>
+                          <h3 className={`text-xl font-bold mb-2 flex items-center gap-2 ${isWedding ? 'text-pink-400' : 'text-blue-400'}`}>
+                             {isWedding ? <i className="ph ph-heart"></i> : <i className="ph ph-user"></i>} {displayName}
+                          </h3>
+                          <p className="text-sm text-slate-400 mb-5 leading-relaxed whitespace-pre-wrap">{displayReqs}</p>
+                          
+                          {isWedding && txn.weddingDate && (
+                              <div className="bg-slate-950 p-3 rounded-xl mb-4 border border-slate-800 flex items-center justify-between text-sm">
+                                  <span className="text-slate-400">موعد الزفاف:</span>
+                                  <span className="font-bold text-pink-300">{formatDateOnly(txn.weddingDate)}</span>
+                              </div>
+                          )}
+
+                          <div className="flex justify-between bg-slate-950 p-4 rounded-2xl border border-slate-800 text-sm">
+                               <div className="flex flex-col items-center gap-1">
+                                   <span className="text-slate-500 text-xs">المدفوع</span>
+                                   <span className="text-green-400 font-bold">{txn.paid} ج.م</span>
+                               </div>
+                               <div className="w-px bg-slate-800"></div>
+                               <div className="flex flex-col items-center gap-1">
+                                   <span className="text-slate-500 text-xs">الباقي الدفع</span>
+                                   <span className="text-red-400 font-bold">{txn.remaining} ج.م</span>
+                               </div>
+                          </div>
+                      </div>
+
+                      {/* Electronic Payment Info Card (Appears only if there is remaining amount) */}
+                      {txn.remaining > 0 && (
+                          <div className="w-full max-w-md bg-gradient-to-br from-indigo-950 to-slate-900 p-6 rounded-3xl shadow-xl border border-indigo-500/30 mb-8 text-center relative overflow-hidden">
+                              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+                              <div className="flex justify-center mb-4">
+                                  <div className="bg-indigo-500/20 p-4 rounded-full text-indigo-400 shadow-lg shadow-indigo-900/20">
+                                      <i className="ph ph-wallet text-3xl"></i>
+                                  </div>
+                              </div>
+                              <h3 className="text-lg font-bold text-white mb-2">سداد إلكتروني متاح 💳</h3>
+                              <p className="text-sm text-indigo-200/80 leading-relaxed mb-4">
+                                  لراحتك، يمكنك الآن سداد باقي المبلغ المستحق (<b className="text-white">{txn.remaining} ج.م</b>) بكل سهولة عبر 
+                                  <span className="text-white font-bold mx-1">إنستاباي (InstaPay)</span> أو <span className="text-white font-bold mx-1">المحافظ الإلكترونية</span>.
+                              </p>
+                              
+                              <div className="bg-slate-950/80 py-3 px-4 rounded-2xl border border-indigo-500/20 flex flex-col items-center gap-1 shadow-inner mb-4">
+                                  <span className="text-xs text-indigo-300">رقم التحويل (فودافون كاش / إنستاباي):</span>
+                                  <div className="flex items-center gap-3 mt-1">
+                                      <span className="text-2xl font-black font-mono text-white tracking-widest">01126810107</span>
+                                      <button onClick={(e) => {
+                                          const el = document.createElement('textarea');
+                                          el.value = '01126810107';
+                                          document.body.appendChild(el);
+                                          el.select();
+                                          document.execCommand('copy');
+                                          document.body.removeChild(el);
+                                          const originalHTML = e.currentTarget.innerHTML;
+                                          e.currentTarget.innerHTML = '<i class="ph ph-check text-lg"></i>';
+                                          setTimeout(() => e.currentTarget.innerHTML = originalHTML, 2000);
+                                      }} className="text-indigo-400 hover:text-indigo-300 bg-indigo-900/30 p-2 rounded-lg transition-colors" title="نسخ الرقم"><i className="ph ph-copy text-lg"></i></button>
+                                  </div>
+                              </div>
+
+                              <div className="mb-5 text-right bg-indigo-900/20 p-4 rounded-xl border border-indigo-500/30">
+                                  <label className="block text-sm font-bold text-indigo-300 mb-3"><i className="ph ph-upload-simple text-lg align-middle ml-1"></i> إرفاق صورة التحويل أولاً لتأكيد السداد:</label>
+                                  <input type="file" accept="image/*" onChange={(e) => {
+                                          const file = e.target.files[0];
+                                          if (!file) return;
+                                          const reader = new FileReader();
+                                          reader.readAsDataURL(file);
+                                          reader.onload = (event) => {
+                                              const img = new Image();
+                                              img.src = event.target.result;
+                                              img.onload = () => {
+                                                  const canvas = document.createElement('canvas');
+                                                  const MAX_WIDTH = 800;
+                                                  let scaleSize = 1;
+                                                  if (img.width > MAX_WIDTH) scaleSize = MAX_WIDTH / img.width;
+                                                  canvas.width = img.width * scaleSize;
+                                                  canvas.height = img.height * scaleSize;
+                                                  const ctx = canvas.getContext('2d');
+                                                  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                                                  setTransferReceipt(canvas.toDataURL('image/jpeg', 0.6));
+                                                  setClientViewError('');
+                                              };
+                                          };
+                                      }} className="block w-full text-sm text-slate-400 file:ml-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 transition-colors bg-slate-950 rounded-xl"
+                                  />
+                                  {clientViewError && <p className="text-red-400 text-xs mt-2 font-bold flex items-center gap-1"><i className="ph ph-warning text-base"></i> {clientViewError}</p>}
+                                  {transferReceipt && <p className="text-green-400 text-xs mt-3 font-bold flex items-center gap-1"><i className="ph ph-check-circle text-base"></i> تم إرفاق الصورة بنجاح وجاهز للتأكيد</p>}
+                              </div>
+
+                              <button onClick={async () => {
+                                  if (!transferReceipt) { setClientViewError('عذراً، برجاء إرفاق صورة التحويل أولاً لتأكيد السداد.'); return; }
+                                  setIsUploading(true);
+                                  try {
+                                      const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
+                                      const updated = { ...txn, pendingReceipt: transferReceipt };
+                                      const targetCol = isWedding ? 'weddings' : 'transactions';
+                                      await setDoc(doc(db, `artifacts/${appId}/public/data/${targetCol}`, txn.id), updated);
+                                      const confirmMsg = `مرحباً، قمت بتحويل مبلغ ${txn.remaining} ج.م لسداد باقي حساب إيصال رقم #${txn.receiptNo} باسم ${displayName}.\n✅ وقمت برفع صورة التحويل في رابط التتبع لتأكيد الدفع.`;
+                                      openWhatsApp('01201260040', confirmMsg);
+                                  } catch (err) { setClientViewError('حدث خطأ أثناء الحفظ، يرجى المحاولة مرة أخرى.'); }
+                                  setIsUploading(false);
+                              }} disabled={isUploading} className={`w-full font-bold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 ${isUploading || !transferReceipt ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500 text-white shadow-green-900/20'}`}>
+                                  {isUploading ? <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <><i className="ph ph-whatsapp-logo text-2xl"></i> تأكيد التحويل عبر واتساب</>}
+                              </button>
+                          </div>
+                      )}
+
+                      {/* Timeline */}
+                      <div className="w-full max-w-md bg-slate-900 p-6 sm:p-8 rounded-3xl shadow-xl border border-slate-800 mb-8">
+                          <h3 className="font-bold text-lg mb-8 flex items-center gap-2 border-b border-slate-800 pb-4"><i className="ph ph-clock-counter-clockwise text-blue-500"></i> مراحل تجهيز الطلب:</h3>
+                          <div className="relative pl-4 space-y-8 pr-4">
+                              <div className="absolute right-[31px] top-6 bottom-6 w-[2px] bg-slate-800"></div>
+                              {ORDER_STATUSES.map((s, index) => {
+                                  const isCompleted = currentStatus >= s.id;
+                                  const isCurrent = currentStatus === s.id;
+                                  return (
+                                      <div key={s.id} className="relative flex items-start gap-5">
+                                          <div className={`relative z-10 flex items-center justify-center w-12 h-12 rounded-full shrink-0 border-4 transition-colors ${isCompleted ? s.clientIconCompleted : 'border-slate-900 bg-slate-800 text-slate-600'}`}>
+                                              <i className={`ph ${s.icon} text-xl`}></i>
+                                          </div>
+                                          <div className={`flex-1 p-4 rounded-2xl border transition-all mt-[-4px] ${isCurrent ? s.clientCardCurrent : isCompleted ? 'bg-slate-800/30 border-slate-800/50' : 'bg-slate-950/50 border-slate-800/30'}`}>
+                                              <h4 className={`font-bold text-sm sm:text-base ${isCurrent ? s.clientTextCurrent : isCompleted ? 'text-slate-200' : 'text-slate-600'}`}>{s.label}</h4>
+                                              {isCurrent && <p className={`text-xs mt-2 opacity-80 leading-relaxed ${s.clientTextCurrent}`}>هذه هي المرحلة الحالية لطلبك. سنقوم بتحديثها فور انتقالنا للمرحلة التالية.</p>}
+                                              {(isCompleted && !isCurrent) && <p className="text-xs mt-1 text-slate-500"><i className="ph ph-check"></i> تمت بنجاح</p>}
+                                          </div>
+                                      </div>
+                                  );
+                              })}
+                          </div>
+                      </div>
+                  </div>
+              );
+          }
+
+          if (!authReady) {
+              return (
+                  <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-100">
+                      <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                      <p className="font-bold">جاري المزامنة مع السحابة...</p>
+                  </div>
+              );
+          }
 
           return (
             <div className="min-h-screen bg-slate-950 text-slate-100 pb-20">
               {authError && <div className="bg-red-600 text-white text-center py-1 font-bold text-xs">{authError}</div>}
-              {isTracking ? null : <Navigation />}
+              {isTracking ? null : <Navigation activeTab={activeTab} setActiveTab={setActiveTab} settings={settings} />}
               <main className={`max-w-7xl mx-auto ${isTracking ? '' : 'p-4 md:p-6'}`}>
                 {isTracking ? null : (
                     <>
-                        {activeTab === 'dashboard' && <DashboardTab />}
-                        {activeTab === 'weddings' && <WeddingsTab />}
-                        {activeTab === 'expenses' && <ExpensesTab />}
-                        {activeTab === 'reports' && <ReportsTab />}
-                        {activeTab === 'settings' && <SettingsTab />}
+                        {activeTab === 'dashboard' && <DashboardTab settings={settings} setSettings={setSettings} transactions={transactions} inventory={inventory} db={db} />}
+                        {activeTab === 'weddings' && <WeddingsTab settings={settings} setSettings={setSettings} weddings={weddings} inventory={inventory} db={db} />}
+                        {activeTab === 'expenses' && <ExpensesTab settings={settings} expenses={expenses} inventory={inventory} db={db} />}
+                        {activeTab === 'reports' && <ReportsTab settings={settings} transactions={transactions} weddings={weddings} expenses={expenses} />}
+                        {activeTab === 'settings' && <SettingsTab settings={settings} setSettings={setSettings} />}
                     </>
                 )}
               </main>
