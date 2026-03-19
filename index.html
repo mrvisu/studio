@@ -599,6 +599,7 @@
                       
                       <div className="flex flex-wrap gap-2 text-xs font-bold">
                           <span className="bg-slate-900 border border-slate-700 px-2.5 py-1.5 rounded-lg text-slate-300 flex items-center gap-1">سعر البيع: <b className="text-purple-400">{prod.price} ج.م</b></span>
+                          <span className="bg-slate-900 border border-slate-700 px-2.5 py-1.5 rounded-lg text-slate-300 flex items-center gap-1">سعر الجملة: <b className="text-orange-400">{prod.wholesalePrice || 0} ج.م</b></span>
                           <span className="bg-slate-900 border border-slate-700 px-2.5 py-1.5 rounded-lg text-slate-300 flex items-center gap-1">العدد الكلي: <b className="text-blue-400">{prod.totalQty || 0}</b></span>
                       </div>
                     </div>
@@ -1258,7 +1259,6 @@
                 
                 <PaymentModal payModal={payModal} setPayModal={setPayModal} db={db} />
                 <TxnDetailsModal txnDetailsModal={txnDetailsModal} setTxnDetailsModal={setTxnDetailsModal} setReceiptImageModal={setReceiptImageModal} allRecords={allRecords} />
-                <ReceiptModal imageUrl={receiptImageModal} onClose={() => setReceiptImageModal(null)} />
               </div>
             );
         };
@@ -1615,7 +1615,6 @@
 
                 <PaymentModal payModal={payModal} setPayModal={setPayModal} db={db} />
                 <TxnDetailsModal txnDetailsModal={txnDetailsModal} setTxnDetailsModal={setTxnDetailsModal} setReceiptImageModal={setReceiptImageModal} allRecords={allRecords} />
-                <ReceiptModal imageUrl={receiptImageModal} onClose={() => setReceiptImageModal(null)} />
               </div>
             );
         };
@@ -1745,7 +1744,7 @@
             );
         };
 
-        const ReportsTab = ({ settings, transactions, weddings, expenses }) => {
+        const ReportsTab = ({ settings, transactions, weddings, expenses, setReceiptImageModal }) => {
             const currentMonth = new Date().getMonth() + 1;
             const currentYear = new Date().getFullYear();
             const [filter, setFilter] = useState({ month: currentMonth, year: currentYear });
@@ -1912,6 +1911,15 @@
                                                 <span className="bg-slate-800 text-slate-400 text-[10px] px-2 py-0.5 rounded font-mono">#{txn.receiptNo}</span>
                                             </div>
                                             <div className="text-xs text-slate-500 font-mono mt-1">📞 {txn.phone} | 📅 {formatDateOnly(txn.dateTime)} | 💰 {txn.total} ج.م</div>
+                                            
+                                            {txn.confirmedReceipts && txn.confirmedReceipts.length > 0 && (
+                                                <div className="flex items-center gap-2 mt-3">
+                                                    <span className="text-xs text-slate-500"><i className="ph ph-check-circle text-green-500"></i> إيصالات السداد:</span>
+                                                    {txn.confirmedReceipts.map((imgUrl, idx) => (
+                                                        <img key={idx} src={imgUrl} alt="إيصال" className="w-8 h-8 object-cover rounded border border-slate-700 cursor-pointer hover:opacity-80 transition-all" onClick={() => setReceiptImageModal(imgUrl)} title="تكبير الإيصال" />
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                         
                                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full lg:w-auto shrink-0">
@@ -1970,18 +1978,28 @@
                                         const isWed = txn.type === 'wedding';
                                         const name = isWed ? `${txn.groomName || ''} و ${txn.brideName || ''}`.trim() : txn.clientName;
                                         return (
-                                            <div key={txn.id} className="bg-slate-950 p-4 rounded-xl border border-indigo-500/20 flex justify-between items-center hover:border-indigo-500/50 transition-colors">
-                                                <div>
-                                                    <div className="font-bold text-slate-200 flex items-center gap-2">
-                                                        <i className={`text-lg ${isWed ? 'ph-fill ph-heart text-pink-500' : 'ph-fill ph-camera text-blue-500'}`}></i>
-                                                        {name || 'بدون اسم'}
+                                            <div key={txn.id} className="bg-slate-950 p-4 rounded-xl border border-indigo-500/20 flex flex-col gap-3 hover:border-indigo-500/50 transition-colors">
+                                                <div className="flex justify-between items-center">
+                                                    <div>
+                                                        <div className="font-bold text-slate-200 flex items-center gap-2">
+                                                            <i className={`text-lg ${isWed ? 'ph-fill ph-heart text-pink-500' : 'ph-fill ph-camera text-blue-500'}`}></i>
+                                                            {name || 'بدون اسم'}
+                                                        </div>
+                                                        <div className="text-xs text-slate-500 font-mono mt-1">📞 {txn.phone} | #{txn.receiptNo}</div>
+                                                        <div className="text-[10px] text-slate-400 mt-1">📅 {formatDateOnly(txn.dateTime)}</div>
                                                     </div>
-                                                    <div className="text-xs text-slate-500 font-mono mt-1">📞 {txn.phone} | #{txn.receiptNo}</div>
-                                                    <div className="text-[10px] text-slate-400 mt-1">📅 {formatDateOnly(txn.dateTime)}</div>
+                                                    <div className="text-left bg-indigo-950/40 border border-indigo-900/50 px-3 py-1.5 rounded-lg">
+                                                        <span className="text-indigo-400 font-black">{txn.electronicPaid} ج.م</span>
+                                                    </div>
                                                 </div>
-                                                <div className="text-left bg-indigo-950/40 border border-indigo-900/50 px-3 py-1.5 rounded-lg">
-                                                    <span className="text-indigo-400 font-black">{txn.electronicPaid} ج.م</span>
-                                                </div>
+                                                
+                                                {txn.confirmedReceipts && txn.confirmedReceipts.length > 0 && (
+                                                    <div className="flex gap-2 mt-2 pt-2 border-t border-slate-800/50">
+                                                        {txn.confirmedReceipts.map((imgUrl, idx) => (
+                                                            <img key={idx} src={imgUrl} alt="إيصال مؤكد" className="w-12 h-12 object-cover rounded-lg border border-indigo-500/30 cursor-pointer hover:opacity-80 transition-all" onClick={(e) => { e.stopPropagation(); setReceiptImageModal(imgUrl); }} title="اضغط لتكبير صورة الإيصال" />
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })
@@ -2159,6 +2177,7 @@
           const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
           
           const [isAuthenticatedAdmin, setIsAuthenticatedAdmin] = useState(false);
+          const [receiptImageModal, setReceiptImageModal] = useState(null);
 
           const [transactions, setTransactions] = useState([]);
           const [weddings, setWeddings] = useState([]);
@@ -2629,11 +2648,13 @@
                         {activeTab === 'dashboard' && <DashboardTab settings={settings} setSettings={setSettings} transactions={transactions} inventory={inventory} db={db} allRecords={allRecords} />}
                         {activeTab === 'weddings' && <WeddingsTab settings={settings} setSettings={setSettings} weddings={weddings} inventory={inventory} db={db} allRecords={allRecords} />}
                         {activeTab === 'expenses' && <ExpensesTab settings={settings} expenses={expenses} inventory={inventory} db={db} />}
-                        {activeTab === 'reports' && <ReportsTab settings={settings} transactions={transactions} weddings={weddings} expenses={expenses} />}
+                        {activeTab === 'reports' && <ReportsTab settings={settings} transactions={transactions} weddings={weddings} expenses={expenses} setReceiptImageModal={setReceiptImageModal} />}
                         {activeTab === 'settings' && <SettingsTab settings={settings} setSettings={setSettings} inventory={inventory} updateInventoryExact={updateInventoryExact} saveSettingsToDB={saveSettingsToDB} />}
                     </>
                 )}
               </main>
+              
+              <ReceiptModal imageUrl={receiptImageModal} onClose={() => setReceiptImageModal(null)} />
             </div>
           );
         }
