@@ -447,23 +447,23 @@
             const currentTheme = themeColors[colorTheme] || themeColors.blue;
 
             return (
-              <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 transition-all shadow-sm flex flex-col gap-2 group hover:border-slate-700">
-                <div className="flex justify-between items-start gap-2">
-                  <span className={`${currentTheme.text} text-sm font-bold ${currentTheme.hoverText} flex-1 leading-snug`}>{srvObj.name}</span>
-                  <div className="flex items-center bg-slate-950 rounded-md border border-slate-700 px-2 py-1 focus-within:border-slate-500 transition-colors w-24 shrink-0">
-                     <input type="number" value={customPrice} onChange={e => setCustomPrice(parseFloat(e.target.value) || 0)} className="w-full bg-transparent text-white text-center outline-none text-xs font-bold" />
-                     <span className="text-[10px] text-slate-500 mr-1">ج.م</span>
+              <div className="bg-slate-900 p-2.5 rounded-xl border border-slate-800 transition-all shadow-sm flex flex-col gap-1.5 group hover:border-slate-700">
+                <div className="flex flex-col xl:flex-row justify-between items-start gap-1.5">
+                  <span className={`${currentTheme.text} text-[11px] sm:text-xs font-bold ${currentTheme.hoverText} flex-1 leading-snug line-clamp-2`}>{srvObj.name}</span>
+                  <div className="flex items-center bg-slate-950 rounded-md border border-slate-700 px-1 py-0.5 focus-within:border-slate-500 transition-colors shrink-0">
+                     <input type="number" value={customPrice} onChange={e => setCustomPrice(parseFloat(e.target.value) || 0)} className="w-10 sm:w-12 bg-transparent text-white text-center outline-none text-[10px] sm:text-xs font-bold" />
+                     <span className="text-[8px] sm:text-[9px] text-slate-500 mr-0.5">ج.م</span>
                   </div>
                 </div>
-                {srvObj.desc && <span className="text-xs text-slate-500 leading-relaxed">{srvObj.desc}</span>}
-                <div className="flex items-center gap-2 mt-auto pt-2 border-t border-slate-800/50">
-                  <div className="flex items-center bg-slate-950 rounded-lg border border-slate-700 overflow-hidden">
-                    <button type="button" onClick={(e) => { e.preventDefault(); setQty(Math.max(1, qty - 1)); }} className="px-2.5 py-1 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors font-black">-</button>
-                    <input type="number" min="1" value={qty} onChange={e => setQty(parseInt(e.target.value) || 1)} className="w-8 bg-transparent text-white text-center outline-none text-sm font-bold" />
-                    <button type="button" onClick={(e) => { e.preventDefault(); setQty(qty + 1); }} className="px-2.5 py-1 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors font-black">+</button>
+                {srvObj.desc && <span className="text-[9px] sm:text-[10px] text-slate-500 leading-relaxed truncate" title={srvObj.desc}>{srvObj.desc}</span>}
+                <div className="flex items-center gap-1.5 mt-auto pt-1.5 border-t border-slate-800/50">
+                  <div className="flex items-center bg-slate-950 rounded-lg border border-slate-700 overflow-hidden shrink-0">
+                    <button type="button" onClick={(e) => { e.preventDefault(); setQty(Math.max(1, qty - 1)); }} className="px-1.5 py-0.5 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors font-black text-xs">-</button>
+                    <input type="number" min="1" value={qty} onChange={e => setQty(parseInt(e.target.value) || 1)} className="w-5 bg-transparent text-white text-center outline-none text-[11px] font-bold" />
+                    <button type="button" onClick={(e) => { e.preventDefault(); setQty(qty + 1); }} className="px-1.5 py-0.5 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors font-black text-xs">+</button>
                   </div>
-                  <button type="button" onClick={(e) => { e.preventDefault(); onAdd({...srvObj, price: customPrice}, qty); setQty(1); setCustomPrice(srvObj.price||0); }} className={`flex-1 text-white text-xs font-bold py-1.5 rounded-lg transition-colors flex justify-center items-center gap-1 ${currentTheme.btn}`}>
-                    <i className="ph ph-plus-circle text-sm"></i> إضافة
+                  <button type="button" onClick={(e) => { e.preventDefault(); onAdd({...srvObj, price: customPrice}, qty); setQty(1); setCustomPrice(srvObj.price||0); }} className={`flex-1 text-white text-[10px] sm:text-xs font-bold py-1 rounded-lg transition-colors flex justify-center items-center gap-1 ${currentTheme.btn}`}>
+                    <i className="ph ph-plus-circle text-xs"></i> <span className="hidden sm:inline">إضافة</span>
                   </button>
                 </div>
               </div>
@@ -1087,7 +1087,7 @@
                           <div className="flex justify-between items-center mb-3">
                               <label className="text-sm font-bold text-slate-400"><i className="ph ph-camera text-blue-400 text-lg align-middle"></i> الخدمات السريعة:</label>
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mb-5">
                             {settings.services.map((srv, idx) => {
                               const srvObj = typeof srv === 'string' ? {name: srv, price: 0, desc: ''} : srv;
                               return <QuickServiceCard key={`srv-${idx}`} srvObj={srvObj} onAdd={handleAddService} colorTheme="blue" />;
@@ -1097,7 +1097,7 @@
                           <div className="flex justify-between items-center mb-3 border-t border-slate-800 pt-4">
                               <label className="text-sm font-bold text-slate-400"><i className="ph ph-package text-purple-400 text-lg align-middle"></i> البضاعة والمنتجات:</label>
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mb-4">
                             {settings.products && settings.products.map((prod, idx) => {
                               const prodObj = typeof prod === 'string' ? {name: prod, price: 0, desc: ''} : prod;
                               return <QuickServiceCard key={`prod-${idx}`} srvObj={prodObj} onAdd={handleAddService} colorTheme="purple" />;
