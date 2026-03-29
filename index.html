@@ -72,7 +72,6 @@
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
-        import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js';
 
         const { useState, useEffect, useMemo } = React;
 
@@ -152,7 +151,6 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const storage = getStorage(app);
 
         // --- Helper Functions ---
         const formatCurrency = (num) => Number(num || 0).toLocaleString('ar-EG') + ' ج.م';
@@ -626,7 +624,6 @@
                   remaining: payModal.total - (payModal.paid + amount) 
               };
               
-              // حفظ الصورة المؤكدة
               if (updated.pendingReceipt && payModal.paymentType === 'electronic') {
                   updated.confirmedReceipts = [...(updated.confirmedReceipts || []), updated.pendingReceipt];
               }
@@ -671,7 +668,7 @@
             );
         };
 
-        const TxnDetailsModal = ({ txnDetailsModal, setTxnDetailsModal, setReceiptImageModal, db, storage, allRecords }) => {
+        const TxnDetailsModal = ({ txnDetailsModal, setTxnDetailsModal, setReceiptImageModal, db, allRecords }) => {
             const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
             const [uploadProgress, setUploadProgress] = useState(0);
 
@@ -683,30 +680,62 @@
             
             const customerHistory = allRecords ? allRecords.filter(t => t.phone === txnDetailsModal.phone && t.id !== txnDetailsModal.id).sort((a,b) => new Date(b.dateTime) - new Date(a.dateTime)) : [];
 
+            // دالة قراءة وضغط الصورة باستخدام Canvas لتقليل حجمها قبل حفظها في Firestore
+            const readAndCompressFile = (file) => {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.src = event.target.result;
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const MAX_WIDTH = 1200; // حجم مناسب ومقبول للصور
+                            let scaleSize = 1;
+                            if (img.width > MAX_WIDTH) scaleSize = MAX_WIDTH / img.width;
+                            canvas.width = img.width * scaleSize;
+                            canvas.height = img.height * scaleSize;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                            // ضغط الصورة إلى JPEG بجودة 0.6 لتناسب المساحة
+                            const base64 = canvas.toDataURL('image/jpeg', 0.6);
+                            resolve({ name: file.name, url: base64 });
+                        };
+                    };
+                });
+            };
+
             const handlePhotoUpload = async (e) => {
                 const files = Array.from(e.target.files);
                 if (files.length === 0) return;
                 setIsUploadingPhotos(true);
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
-                let newUploaded = [...(txnDetailsModal.uploadedPhotos || [])];
-
+                
                 try {
+                    let newUploaded = [...(txnDetailsModal.uploadedPhotos || [])];
                     for (let i = 0; i < files.length; i++) {
-                        const file = files[i];
-                        const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-                        const storageRef = ref(storage, `artifacts/${appId}/public/data/photos/${txnDetailsModal.id}_${Date.now()}_${safeName}`);
-                        const snapshot = await uploadBytesResumable(storageRef, file);
-                        const url = await getDownloadURL(snapshot.ref);
-                        newUploaded.push({ name: file.name, url: url, path: snapshot.ref.fullPath });
+                        const compressedPhoto = await readAndCompressFile(files[i]);
+                        newUploaded.push(compressedPhoto);
                         setUploadProgress(Math.round(((i + 1) / files.length) * 100));
                     }
+
+                    // التحقق من الحجم التقريبي لعدم تجاوز حد Firestore (1 ميجابايت)
+                    const totalSize = JSON.stringify(newUploaded).length;
+                    if (totalSize > 900000) { 
+                        alert("عذراً، مساحة الصور المرفوعة تتجاوز الحد المسموح به للعملية الواحدة. يرجى تقليل عدد الصور أو استخدام رابط خارجي.");
+                        setIsUploadingPhotos(false);
+                        setUploadProgress(0);
+                        e.target.value = null;
+                        return;
+                    }
+
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
                     const updated = {...txnDetailsModal, uploadedPhotos: newUploaded};
                     const targetCol = updated.type === 'wedding' ? 'weddings' : 'transactions';
                     await setDoc(doc(db, `artifacts/${appId}/public/data/${targetCol}`, updated.id), updated);
                     setTxnDetailsModal(updated);
                 } catch (error) {
                     console.error("Upload error:", error);
-                    alert("حدث خطأ أثناء رفع الصور.");
+                    alert("حدث خطأ أثناء معالجة وحفظ الصور.");
                 }
                 setIsUploadingPhotos(false);
                 setUploadProgress(0);
@@ -715,16 +744,11 @@
 
             const handleDeletePhoto = async (index) => {
                 if(!confirm("هل أنت متأكد من حذف هذه الصورة؟")) return;
-                const photo = txnDetailsModal.uploadedPhotos[index];
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
                 const newUploaded = [...txnDetailsModal.uploadedPhotos];
                 newUploaded.splice(index, 1);
                 
                 try {
-                    if (photo.path) {
-                        const storageRef = ref(storage, photo.path);
-                        await deleteObject(storageRef);
-                    }
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
                     const updated = {...txnDetailsModal, uploadedPhotos: newUploaded};
                     const targetCol = updated.type === 'wedding' ? 'weddings' : 'transactions';
                     await setDoc(doc(db, `artifacts/${appId}/public/data/${targetCol}`, updated.id), updated);
@@ -804,11 +828,13 @@
                        )}
                     </div>
 
-                    {/* قسم رفع الصور مباشرة (Firebase Storage) */}
+                    {/* قسم رفع الصور المضغوطة (Base64) */}
                     <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 mt-4">
-                       <p className="text-slate-500 text-sm font-bold mb-3 flex items-center gap-2">
-                           <i className="ph ph-upload-simple text-green-500 text-lg"></i> رفع صور بجودة عالية (مباشرة للعميل)
+                       <p className="text-slate-500 text-sm font-bold flex items-center gap-2 mb-1">
+                           <i className="ph ph-upload-simple text-green-500 text-lg"></i> رفع صور للعميل (يتم ضغطها تلقائياً لتناسب المساحة)
                        </p>
+                       <p className="text-[10px] text-slate-400 mb-3">*يفضل استخدام هذه الميزة للصور القليلة فقط. للألبومات الكبيرة، يرجى استخدام (رابط خارجي) بالأعلى.</p>
+                       
                        <div className="flex flex-col gap-3">
                           <input type="file" multiple accept="image/*" onChange={handlePhotoUpload} disabled={isUploadingPhotos} className="block w-full text-sm text-slate-400 file:ml-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-green-900/30 file:text-green-400 hover:file:bg-green-900/50 transition-colors border border-slate-700 rounded-xl cursor-pointer" />
                           {isUploadingPhotos && (
@@ -1051,8 +1077,8 @@
                     {showWaMenu && (
                       <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-10 p-1 flex flex-col overflow-hidden">
                         <button onClick={(e) => { e.stopPropagation(); openWhatsApp(txn.phone, generateWA_Message('tracking', txn, settings, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2.5 text-sm text-blue-300 hover:bg-slate-700 font-bold border-b border-slate-700">📍 رابط التتبع للعميل</button>
-                        {txn.photosLink && (
-                            <button onClick={(e) => { e.stopPropagation(); openWhatsApp(txn.phone, `أهلاً ${displayName} 👋\nصورك جاهزة للتحميل بجودة عالية! يمكنك تحميلها وحفظها من هذا الرابط:\n${txn.photosLink}`); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-green-400 hover:bg-slate-700 font-bold border-b border-slate-700 flex items-center gap-2"><i className="ph ph-download-simple"></i> إرسال رابط الصور</button>
+                        {(txn.photosLink || (txn.uploadedPhotos && txn.uploadedPhotos.length > 0)) && (
+                            <button onClick={(e) => { e.stopPropagation(); openWhatsApp(txn.phone, `أهلاً ${displayName} 👋\nصورك جاهزة للتحميل بجودة عالية! يمكنك تحميلها وحفظها من هذا الرابط:\n${window.location.href.split('?')[0]}?phone=${encodeURIComponent(txn.phone)}&receipt=${encodeURIComponent(txn.receiptNo)}&type=${isWedding ? 'w' : 't'}`); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-green-400 hover:bg-slate-700 font-bold border-b border-slate-700 flex items-center gap-2"><i className="ph ph-download-simple"></i> إرسال رابط الصور</button>
                         )}
                         {isRepeat && (
                             <button onClick={(e) => { e.stopPropagation(); openWhatsApp(txn.phone, generateWA_Message('vipDiscount', txn, settings, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-pink-400 hover:bg-slate-700 font-bold">🎁 إرسال هدية خصم (VIP)</button>
@@ -1148,7 +1174,7 @@
             );
         };
 
-        const DashboardTab = ({ settings, setSettings, transactions, inventory, db, storage, allRecords }) => {
+        const DashboardTab = ({ settings, setSettings, transactions, inventory, db, allRecords }) => {
             const [showAddModal, setShowAddModal] = useState(false);
             const [isEditing, setIsEditing] = useState(false);
             const [formData, setFormData] = useState({ clientName: '', phone: '', photoNo: [''], requirements: '', total: '', paid: '', paymentMethod: 'cash', soldProducts: [], photosLink: '' });
@@ -1440,12 +1466,12 @@
                 )}
                 
                 <PaymentModal payModal={payModal} setPayModal={setPayModal} db={db} />
-                <TxnDetailsModal txnDetailsModal={txnDetailsModal} setTxnDetailsModal={setTxnDetailsModal} setReceiptImageModal={setReceiptImageModal} db={db} storage={storage} allRecords={allRecords} />
+                <TxnDetailsModal txnDetailsModal={txnDetailsModal} setTxnDetailsModal={setTxnDetailsModal} setReceiptImageModal={setReceiptImageModal} db={db} allRecords={allRecords} />
               </div>
             );
         };
 
-        const WeddingsTab = ({ settings, setSettings, weddings, inventory, db, storage, allRecords }) => {
+        const WeddingsTab = ({ settings, setSettings, weddings, inventory, db, allRecords }) => {
             const [showAddModal, setShowAddModal] = useState(false);
             const [isEditing, setIsEditing] = useState(false);
             const [query, setQuery] = useState('');
@@ -1829,7 +1855,7 @@
                 )}
 
                 <PaymentModal payModal={payModal} setPayModal={setPayModal} db={db} />
-                <TxnDetailsModal txnDetailsModal={txnDetailsModal} setTxnDetailsModal={setTxnDetailsModal} setReceiptImageModal={setReceiptImageModal} db={db} storage={storage} allRecords={allRecords} />
+                <TxnDetailsModal txnDetailsModal={txnDetailsModal} setTxnDetailsModal={setTxnDetailsModal} setReceiptImageModal={setReceiptImageModal} db={db} allRecords={allRecords} />
               </div>
             );
         };
@@ -2773,6 +2799,7 @@
                           </div>
                       )}
 
+                      {/* Timeline */}
                       <div className="w-full max-w-md bg-slate-900 p-6 sm:p-8 rounded-3xl shadow-xl border border-slate-800 mb-8">
                           <h3 className="font-bold text-lg mb-8 flex items-center gap-2 border-b border-slate-800 pb-4"><i className="ph ph-clock-counter-clockwise text-blue-500"></i> مراحل تجهيز الطلب:</h3>
                           <div className="relative pl-4 space-y-8 pr-4">
@@ -2796,6 +2823,7 @@
                           </div>
                       </div>
 
+                      {/* Feedback Box */}
                       <div className="w-full max-w-md bg-gradient-to-br from-slate-900 to-slate-950 p-6 rounded-3xl shadow-xl border border-slate-800 mb-8 relative overflow-hidden">
                           <div className="absolute top-0 right-0 w-1 h-full bg-yellow-500"></div>
                           <h3 className="font-bold text-lg mb-3 flex items-center gap-2 text-slate-100">
@@ -2889,8 +2917,8 @@
               <main className={`max-w-7xl mx-auto ${isTracking ? '' : 'p-4 md:p-6'}`}>
                 {isTracking ? null : (
                     <>
-                        {activeTab === 'dashboard' && <DashboardTab settings={settings} setSettings={setSettings} transactions={transactions} inventory={inventory} db={db} storage={storage} allRecords={allRecords} />}
-                        {activeTab === 'weddings' && <WeddingsTab settings={settings} setSettings={setSettings} weddings={weddings} inventory={inventory} db={db} storage={storage} allRecords={allRecords} />}
+                        {activeTab === 'dashboard' && <DashboardTab settings={settings} setSettings={setSettings} transactions={transactions} inventory={inventory} db={db} allRecords={allRecords} />}
+                        {activeTab === 'weddings' && <WeddingsTab settings={settings} setSettings={setSettings} weddings={weddings} inventory={inventory} db={db} allRecords={allRecords} />}
                         {activeTab === 'expenses' && <ExpensesTab settings={settings} expenses={expenses} inventory={inventory} db={db} />}
                         {activeTab === 'reports' && <ReportsTab settings={settings} transactions={transactions} weddings={weddings} expenses={expenses} setReceiptImageModal={setReceiptImageModal} />}
                         {activeTab === 'settings' && <SettingsTab settings={settings} setSettings={setSettings} inventory={inventory} updateInventoryExact={updateInventoryExact} saveSettingsToDB={saveSettingsToDB} />}
