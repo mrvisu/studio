@@ -714,12 +714,47 @@
         };
 
         const ReceiptModal = ({ imageUrl, onClose }) => {
+            const [isDownloading, setIsDownloading] = useState(false);
             if (!imageUrl) return null;
+
+            const handleDownload = async (e) => {
+                e.stopPropagation();
+                setIsDownloading(true);
+                try {
+                    const response = await fetch(imageUrl);
+                    const blob = await response.blob();
+                    const blobUrl = window.URL.createObjectURL(blob);
+                    
+                    const link = document.createElement('a');
+                    link.href = blobUrl;
+                    link.download = `studio_photo_${Date.now()}.jpg`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(blobUrl);
+                } catch (err) {
+                    console.error("Download failed:", err);
+                    window.open(imageUrl, '_blank');
+                }
+                setIsDownloading(false);
+            };
+
             return (
                 <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4 flex-col gap-4" onClick={onClose}>
                     <button onClick={onClose} className="absolute top-4 left-4 text-slate-300 hover:text-red-400 bg-slate-800 p-2 rounded-full transition-colors z-10"><i className="ph ph-x text-xl"></i></button>
                     <img src={imageUrl} alt="Fullscreen Image" className="max-w-full max-h-[80vh] object-contain rounded-xl shadow-2xl border border-slate-700" onClick={e => e.stopPropagation()} />
-                    <a href={imageUrl} download="studio_photo.jpg" target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-full font-bold flex items-center gap-2 shadow-lg transition-all"><i className="ph ph-download-simple text-xl"></i> تحميل الصورة</a>
+                    <button 
+                        onClick={handleDownload} 
+                        disabled={isDownloading} 
+                        className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:text-slate-400 text-white px-6 py-2.5 rounded-full font-bold flex items-center gap-2 shadow-lg transition-all"
+                    >
+                        {isDownloading ? (
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                            <i className="ph ph-download-simple text-xl"></i>
+                        )}
+                        {isDownloading ? 'جاري التحميل...' : 'تحميل الصورة الأصلية'}
+                    </button>
                 </div>
             );
         };
@@ -848,8 +883,12 @@
                               const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
                               await setDoc(doc(db, `artifacts/${appId}/public/data/${isWedding ? 'weddings' : 'transactions'}`, updated.id), updated);
                               setTxnDetailsModal(updated);
+                              alert("تم حفظ رابط الصور بنجاح!");
                           }} className="bg-blue-600 hover:bg-blue-500 text-white px-4 rounded-lg text-sm font-bold">حفظ</button>
                        </div>
+                       {txnDetailsModal.photosLink && (
+                           <p className="text-xs text-green-400 mt-2 flex items-center gap-1"><i className="ph-fill ph-check-circle"></i> تم إرفاق الرابط. العميل سيتمكن من تحميل صوره عبر رابط التتبع.</p>
+                       )}
                     </div>
 
                     <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 mt-4">
@@ -2178,324 +2217,6 @@
                 </div>
 
               </div>
-            );
-        };
-
-        const ClientTrackingView = ({ txn, trackType, settings, db, setReceiptImageModal, allRecords }) => {
-            const [transferReceipt, setTransferReceipt] = useState(null);
-            const [isUploading, setIsUploading] = useState(false);
-            const [clientViewError, setClientViewError] = useState('');
-            const [feedbackText, setFeedbackText] = useState('');
-            const [rating, setRating] = useState(0);
-            const [hoveredStar, setHoveredStar] = useState(0);
-            const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
-            const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
-
-            const currentStatus = txn.status || 0;
-            const isWedding = trackType === 'w';
-            const displayName = isWedding ? `${txn.groomName || ''} و ${txn.brideName || ''}`.trim() : txn.clientName;
-            const displayReqs = getReqsText(txn);
-            const statusesToUse = getTransactionStatuses(txn);
-
-            return (
-                <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-6 flex flex-col items-center pb-20">
-                    <div className="flex flex-col items-center gap-4 mb-8 mt-8">
-                        <div className="relative">
-                            <div className={`absolute inset-0 blur-2xl opacity-30 rounded-full ${isWedding ? 'bg-pink-500' : 'bg-blue-500'}`}></div>
-                            {settings.studioLogo ? (
-                                <img src={settings.studioLogo} className={`relative z-10 w-24 h-24 rounded-full object-cover shadow-2xl border-2 ${isWedding ? 'border-pink-900/50' : 'border-blue-900/50'}`} alt="Studio Logo" />
-                            ) : (
-                                <div className={`relative z-10 w-24 h-24 bg-slate-900 rounded-full flex items-center justify-center border shadow-2xl ${isWedding ? 'border-pink-900/50 shadow-pink-900/20' : 'border-blue-900/50 shadow-blue-900/20'}`}>
-                                    <i className={`ph-fill ph-camera text-5xl ${isWedding ? 'text-pink-400' : 'text-blue-400'}`}></i>
-                                </div>
-                            )}
-                        </div>
-                        <div className={`bg-slate-900/80 backdrop-blur-md px-6 py-2.5 rounded-full border shadow-sm mt-2 ${isWedding ? 'border-pink-500/20' : 'border-blue-500/20'}`}>
-                            <h1 className={`text-base md:text-lg font-bold tracking-wide ${isWedding ? 'text-pink-100' : 'text-blue-100'}`}>
-                                {isWedding ? 'تتبع حجز الزفاف الخاص بك 💍' : 'تتبع حالة الطلب الخاص بك 📸'}
-                            </h1>
-                        </div>
-                    </div>
-
-                    {txn.photosLink && (
-                        <a href={txn.photosLink} target="_blank" rel="noopener noreferrer" className="w-full max-w-md bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 text-white p-5 rounded-3xl shadow-xl shadow-green-900/20 mb-8 flex items-center justify-center gap-3 font-bold text-lg hover:scale-[1.02] transition-all border border-green-400/30 group">
-                            <div className="bg-white/20 p-2 rounded-full group-hover:animate-bounce">
-                                <i className="ph-bold ph-download-simple text-2xl"></i>
-                            </div>
-                            <span>تحميل الصور (رابط خارجي)</span>
-                        </a>
-                    )}
-
-                    <div className={`w-full max-w-md bg-gradient-to-br ${isWedding ? 'from-pink-950/40 border-pink-500/20' : 'from-blue-950/40 border-blue-500/20'} to-slate-900 p-6 rounded-3xl border mb-8 text-center shadow-lg`}>
-                        <div className={`w-16 h-16 ${isWedding ? 'bg-pink-500/20 text-pink-400 border-pink-500/30' : 'bg-blue-500/20 text-blue-400 border-blue-500/30'} rounded-full flex items-center justify-center mx-auto mb-4 border`}>
-                            <i className={`ph-fill ${isWedding ? 'ph-heart' : 'ph-camera'} text-3xl`}></i>
-                        </div>
-                        <h2 className={`text-xl font-bold ${isWedding ? 'text-pink-300' : 'text-blue-300'} mb-2`}>شكراً لاختياركم {settings.studioName}</h2>
-                        <p className={`text-sm ${isWedding ? 'text-pink-200/80' : 'text-blue-200/80'} leading-relaxed font-medium`}>
-                            {isWedding ? 'يسعدنا ونتشرف بأن نكون جزءاً من أجمل لحظات حياتكم. نسعى دائماً لتوثيق ذكرياتكم بأفضل جودة وحب لتدوم للأبد. ألف مبروك للعروسين! 🎉💍' : 'نسعد دائماً بزيارتكم وثقتكم بنا لتوثيق ذكرياتكم الجميلة. نعمل بكل حب واحترافية لتقديم أفضل جودة تليق بكم. 🌟📸'}
-                        </p>
-                    </div>
-
-                    {txn.uploadedPhotos && txn.uploadedPhotos.length > 0 && (
-                        <div className="w-full max-w-md bg-slate-900 p-6 rounded-3xl shadow-xl border border-slate-800 mb-8 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-2 h-full bg-green-500"></div>
-                            <h3 className="font-bold text-lg mb-2 flex items-center gap-2 text-slate-100">
-                                <i className="ph-fill ph-images text-green-400 text-2xl"></i> صورك الخاصة المرفوعة
-                            </h3>
-                            <p className="text-[11px] text-slate-400 mb-4 leading-relaxed border-b border-slate-800 pb-3">تنويه: الصور محفوظة بجودتها الأصلية لتنزيلها، <b className="text-red-400">وسيتم حذفها نهائياً خلال 5 أيام</b> من تاريخ الرفع، يرجى حفظها لديكم.</p>
-                            
-                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                                {txn.uploadedPhotos.map((photo, idx) => {
-                                    const daysRemaining = photo.expiryTimestamp ? Math.max(0, Math.ceil((photo.expiryTimestamp - Date.now()) / (1000 * 60 * 60 * 24))) : 5;
-                                    return(
-                                    <div key={idx} onClick={() => setReceiptImageModal(photo.url)} className="relative group block rounded-xl overflow-hidden border border-slate-700 aspect-square shadow-sm cursor-pointer">
-                                        <img src={photo.url} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" />
-                                        <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
-                                            <i className="ph-bold ph-download-simple text-white text-xl"></i>
-                                        </div>
-                                        <div className="absolute bottom-0 left-0 right-0 bg-slate-950/90 text-[8px] text-center text-slate-300 font-mono py-1 rounded-b-lg">
-                                            باقي {daysRemaining} أيام
-                                        </div>
-                                    </div>
-                                )})}
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="bg-slate-900 w-full max-w-md p-6 rounded-3xl shadow-xl border border-slate-800 mb-8 relative overflow-hidden">
-                        <div className={`absolute top-0 right-0 w-2 h-full ${isWedding ? 'bg-pink-500' : 'bg-blue-500'}`}></div>
-                        <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-800">
-                            <span className="text-slate-400 text-sm">إيصال رقم</span>
-                            <span className="text-2xl font-black font-mono text-white">#{txn.receiptNo}</span>
-                        </div>
-                        <h3 className={`text-xl font-bold mb-2 flex items-center gap-2 ${isWedding ? 'text-pink-400' : 'text-blue-400'}`}>
-                            {isWedding ? <i className="ph ph-heart"></i> : <i className="ph ph-user"></i>} {displayName}
-                        </h3>
-                        <p className="text-sm text-slate-400 mb-5 leading-relaxed whitespace-pre-wrap">{displayReqs}</p>
-                        
-                        {isWedding && txn.weddingDate && (
-                            <div className="bg-slate-950 p-3 rounded-xl mb-4 border border-slate-800 flex items-center justify-between text-sm">
-                                <span className="text-slate-400">موعد الزفاف:</span>
-                                <span className="font-bold text-pink-300">{formatDateOnly(txn.weddingDate)}</span>
-                            </div>
-                        )}
-
-                        {txn.photoNo && (Array.isArray(txn.photoNo) ? txn.photoNo.some(n=>n) : true) && (
-                            <div className="bg-slate-950 p-3 rounded-xl mb-4 border border-slate-800 flex items-center justify-between text-sm">
-                                <span className="text-slate-400">أرقام الصور:</span>
-                                <span className="font-bold text-white" dir="ltr">{Array.isArray(txn.photoNo) ? txn.photoNo.filter(Boolean).join(' , ') : txn.photoNo}</span>
-                            </div>
-                        )}
-
-                        <div className="flex justify-between bg-slate-950 p-4 rounded-2xl border border-slate-800 text-sm">
-                            <div className="flex flex-col items-center gap-1">
-                                <span className="text-slate-500 text-xs">المدفوع</span>
-                                <span className="text-green-400 font-bold">{txn.paid} ج.م</span>
-                            </div>
-                            <div className="w-px bg-slate-800"></div>
-                            <div className="flex flex-col items-center gap-1">
-                                <span className="text-slate-500 text-xs">الباقي الدفع</span>
-                                <span className="text-red-400 font-bold">{txn.remaining} ج.م</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {txn.remaining > 0 && (
-                        <div className="w-full max-w-md bg-gradient-to-br from-indigo-950 to-slate-900 p-6 rounded-3xl shadow-xl border border-indigo-500/30 mb-8 text-center relative overflow-hidden">
-                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
-                            <div className="flex justify-center mb-4">
-                                <div className="bg-indigo-500/20 p-4 rounded-full text-indigo-400 shadow-lg shadow-indigo-900/20">
-                                    <i className="ph ph-wallet text-3xl"></i>
-                                </div>
-                            </div>
-                            <h3 className="text-lg font-bold text-white mb-2">سداد إلكتروني متاح 💳</h3>
-                            <p className="text-sm text-indigo-200/80 leading-relaxed mb-4">
-                                لراحتك، يمكنك الآن سداد باقي المبلغ المستحق (<b className="text-white">{txn.remaining} ج.م</b>) بكل سهولة عبر 
-                                <span className="text-white font-bold mx-1">إنستاباي (InstaPay)</span> أو <span className="text-white font-bold mx-1">المحافظ الإلكترونية</span>.
-                            </p>
-                            
-                            <div className="bg-slate-950/80 py-3 px-4 rounded-2xl border border-indigo-500/20 flex flex-col items-center gap-1 shadow-inner mb-4">
-                                <span className="text-xs text-indigo-300">رقم التحويل (فودافون كاش / إنستاباي):</span>
-                                <div className="flex items-center gap-3 mt-1">
-                                    <span className="text-2xl font-black font-mono text-white tracking-widest">01126810107</span>
-                                    <button onClick={(e) => {
-                                        const el = document.createElement('textarea');
-                                        el.value = '01126810107';
-                                        document.body.appendChild(el);
-                                        el.select();
-                                        document.execCommand('copy');
-                                        document.body.removeChild(el);
-                                        const originalHTML = e.currentTarget.innerHTML;
-                                        e.currentTarget.innerHTML = '<i class="ph ph-check text-lg"></i>';
-                                        setTimeout(() => e.currentTarget.innerHTML = originalHTML, 2000);
-                                    }} className="text-indigo-400 hover:text-indigo-300 bg-indigo-900/30 p-2 rounded-lg transition-colors" title="نسخ الرقم"><i className="ph ph-copy text-lg"></i></button>
-                                </div>
-                            </div>
-
-                            <div className="mb-5 text-right bg-indigo-900/20 p-4 rounded-xl border border-indigo-500/30">
-                                <label className="block text-sm font-bold text-indigo-300 mb-3"><i className="ph ph-upload-simple text-lg align-middle ml-1"></i> إرفاق صورة التحويل أولاً لتأكيد السداد:</label>
-                                <input type="file" accept="image/*" onChange={(e) => {
-                                        const file = e.target.files[0];
-                                        if (!file) return;
-                                        const reader = new FileReader();
-                                        reader.readAsDataURL(file);
-                                        reader.onload = (event) => {
-                                            const img = new Image();
-                                            img.src = event.target.result;
-                                            img.onload = () => {
-                                                const canvas = document.createElement('canvas');
-                                                const MAX_WIDTH = 800;
-                                                let scaleSize = 1;
-                                                if (img.width > MAX_WIDTH) scaleSize = MAX_WIDTH / img.width;
-                                                canvas.width = img.width * scaleSize;
-                                                canvas.height = img.height * scaleSize;
-                                                const ctx = canvas.getContext('2d');
-                                                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                                                setTransferReceipt(canvas.toDataURL('image/jpeg', 0.6));
-                                                setClientViewError('');
-                                            };
-                                        };
-                                    }} className="block w-full text-sm text-slate-400 file:ml-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 transition-colors bg-slate-950 rounded-xl"
-                                />
-                                {clientViewError && <p className="text-red-400 text-xs mt-2 font-bold flex items-center gap-1"><i className="ph ph-warning text-base"></i> {clientViewError}</p>}
-                                {transferReceipt && <p className="text-green-400 text-xs mt-3 font-bold flex items-center gap-1"><i className="ph ph-check-circle text-base"></i> تم إرفاق الصورة بنجاح وجاهز للتأكيد</p>}
-                            </div>
-
-                            <button onClick={async () => {
-                                if (!transferReceipt) { setClientViewError('عذراً، برجاء إرفاق صورة التحويل أولاً لتأكيد السداد.'); return; }
-                                setIsUploading(true);
-                                try {
-                                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
-                                    const updated = { ...txn, pendingReceipt: transferReceipt };
-                                    const targetCol = isWedding ? 'weddings' : 'transactions';
-                                    await setDoc(doc(db, `artifacts/${appId}/public/data/${targetCol}`, txn.id), updated);
-                                    const confirmMsg = `مرحباً، قمت بتحويل مبلغ ${txn.remaining} ج.م لسداد باقي حساب إيصال رقم #${txn.receiptNo} باسم ${displayName}.\n✅ وقمت برفع صورة التحويل في رابط التتبع لتأكيد الدفع.`;
-                                    openWhatsApp('01201260040', confirmMsg);
-                                } catch (err) { setClientViewError('حدث خطأ أثناء الحفظ، يرجى المحاولة مرة أخرى.'); }
-                                setIsUploading(false);
-                            }} disabled={isUploading} className={`w-full font-bold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 ${isUploading || !transferReceipt ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500 text-white shadow-green-900/20'}`}>
-                                {isUploading ? <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <><i className="ph ph-whatsapp-logo text-2xl"></i> تأكيد التحويل عبر واتساب</>}
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Timeline */}
-                    <div className="w-full max-w-md bg-slate-900 p-6 sm:p-8 rounded-3xl shadow-xl border border-slate-800 mb-8">
-                        <h3 className="font-bold text-lg mb-8 flex items-center gap-2 border-b border-slate-800 pb-4"><i className="ph ph-clock-counter-clockwise text-blue-500"></i> مراحل تجهيز الطلب:</h3>
-                        <div className="relative pl-4 space-y-8 pr-4">
-                            <div className="absolute right-[31px] top-6 bottom-6 w-[2px] bg-slate-800"></div>
-                            {statusesToUse.map((s, index) => {
-                                const isCompleted = currentStatus >= s.id;
-                                const isCurrent = currentStatus === s.id;
-                                return (
-                                    <div key={s.id} className="relative flex items-start gap-5">
-                                        <div className={`relative z-10 flex items-center justify-center w-12 h-12 rounded-full shrink-0 border-4 transition-colors ${isCompleted ? s.clientIconCompleted : 'border-slate-900 bg-slate-800 text-slate-600'}`}>
-                                            <i className={`ph ${s.icon} text-xl`}></i>
-                                        </div>
-                                        <div className={`flex-1 p-4 rounded-2xl border transition-all mt-[-4px] ${isCurrent ? s.clientCardCurrent : isCompleted ? 'bg-slate-800/30 border-slate-800/50' : 'bg-slate-950/50 border-slate-800/30'}`}>
-                                            <h4 className={`font-bold text-sm sm:text-base ${isCurrent ? s.clientTextCurrent : isCompleted ? 'text-slate-200' : 'text-slate-600'}`}>{s.label}</h4>
-                                            {isCurrent && <p className={`text-xs mt-2 opacity-80 leading-relaxed ${s.clientTextCurrent}`}>هذه هي المرحلة الحالية لطلبك. سنقوم بتحديثها فور انتقالنا للمرحلة التالية.</p>}
-                                            {(isCompleted && !isCurrent) && <p className="text-xs mt-1 text-slate-500"><i className="ph ph-check"></i> تمت بنجاح</p>}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* Feedback Box */}
-                    <div className="w-full max-w-md bg-gradient-to-br from-slate-900 to-slate-950 p-6 rounded-3xl shadow-xl border border-slate-800 mb-8 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-1 h-full bg-yellow-500"></div>
-                        <h3 className="font-bold text-lg mb-3 flex items-center gap-2 text-slate-100">
-                            <i className="ph-fill ph-star text-yellow-500 text-2xl"></i> رأيك يهمنا
-                        </h3>
-                        <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-                            نسعى دائماً لتقديم الأفضل لكم. كيف كانت تجربتكم معنا؟ يسعدنا سماع رأيكم أو أي ملاحظات لتطوير خدماتنا.
-                        </p>
-                        
-                        {feedbackSubmitted ? (
-                            <div className="bg-green-950/40 border border-green-500/30 p-4 rounded-xl text-center">
-                                <i className="ph-fill ph-check-circle text-4xl text-green-500 mb-2"></i>
-                                <p className="text-green-400 font-bold">شكراً لك! تم حفظ وإرسال تقييمك بنجاح للإدارة.</p>
-                            </div>
-                        ) : (
-                            <>
-                                <div className="flex justify-center gap-3 mb-5" dir="ltr">
-                                    {[1, 2, 3, 4, 5].map(star => (
-                                        <i
-                                            key={star}
-                                            className={`ph-fill ph-star text-4xl cursor-pointer transition-transform hover:scale-110 ${
-                                                star <= (hoveredStar || rating) ? 'text-yellow-500 drop-shadow-[0_0_8px_rgba(234,179,8,0.5)]' : 'text-slate-700'
-                                            }`}
-                                            onMouseEnter={() => setHoveredStar(star)}
-                                            onMouseLeave={() => setHoveredStar(0)}
-                                            onClick={() => setRating(star)}
-                                        ></i>
-                                    ))}
-                                </div>
-                                <textarea 
-                                    value={feedbackText}
-                                    onChange={(e) => setFeedbackText(e.target.value)}
-                                    placeholder="اكتب رسالتك وتفاصيل تقييمك هنا (اختياري)..." 
-                                    className="w-full p-4 rounded-xl bg-slate-950/50 border border-slate-700 text-sm text-white mb-4 outline-none focus:border-yellow-500 focus:bg-slate-900 transition-colors custom-scrollbar resize-none shadow-inner"
-                                    rows="4"
-                                ></textarea>
-                                <button 
-                                    onClick={async () => {
-                                        if(rating === 0 && !feedbackText.trim()) return;
-                                        setIsSubmittingFeedback(true);
-                                        try {
-                                            const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
-                                            const targetCol = isWedding ? 'weddings' : 'transactions';
-                                            const updatedTxn = { ...txn, clientRating: rating, clientFeedback: feedbackText };
-                                            await setDoc(doc(db, `artifacts/${appId}/public/data/${targetCol}`, txn.id), updatedTxn);
-                                            setFeedbackSubmitted(true);
-                                        } catch(err) {
-                                            console.error("Error saving feedback:", err);
-                                        }
-                                        setIsSubmittingFeedback(false);
-                                    }}
-                                    disabled={isSubmittingFeedback || (rating === 0 && !feedbackText.trim())}
-                                    className={`w-full text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 text-sm border shadow-md group ${(rating === 0 && !feedbackText.trim()) || isSubmittingFeedback ? 'bg-slate-800 border-slate-700 text-slate-500 cursor-not-allowed' : 'bg-slate-800 hover:bg-slate-700 border-slate-700 hover:border-yellow-500/50'}`}
-                                >
-                                    {isSubmittingFeedback ? (
-                                        <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
-                                    ) : (
-                                        <><i className="ph-fill ph-paper-plane-right text-lg text-yellow-500 group-hover:scale-110 transition-transform"></i> حفظ التقييم وإرساله للإدارة</>
-                                    )}
-                                </button>
-                            </>
-                        )}
-                    </div>
-                    
-                    {/* Past Customer Records in Tracking View */}
-                    {(() => {
-                        const pastVisits = allRecords.filter(t => t.phone === txn.phone && t.id !== txn.id).sort((a,b) => new Date(b.dateTime) - new Date(a.dateTime));
-                        if (pastVisits.length === 0) return null;
-                        return (
-                            <div className="w-full max-w-md bg-slate-900 p-6 rounded-3xl shadow-xl border border-slate-800 mb-8">
-                                <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-yellow-400 border-b border-slate-800 pb-3">
-                                    <i className="ph-fill ph-clock-counter-clockwise text-2xl"></i> سجل زياراتك السابقة
-                                </h3>
-                                <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-1">
-                                    {pastVisits.map(r => (
-                                        <div key={r.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex justify-between items-center gap-3">
-                                            <div>
-                                                <span className={`font-bold ml-2 ${r.type === 'wedding' ? 'text-pink-400' : 'text-blue-400'}`}>
-                                                    {r.type === 'wedding' ? 'حجز زفاف' : 'جلسة تصوير'}
-                                                </span>
-                                                <span className="text-slate-500 font-mono text-[11px]">{formatDateOnly(r.dateTime)}</span>
-                                            </div>
-                                            <div className="text-left font-bold text-slate-300 text-sm">
-                                                <span>{r.total} ج.م</span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        );
-                    })()}
-                </div>
             );
         };
 
