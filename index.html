@@ -152,21 +152,12 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const storage = getStorage(app); 
+        const storage = getStorage(app);
 
         // --- Helper Functions ---
         const formatCurrency = (num) => Number(num || 0).toLocaleString('ar-EG') + ' ج.م';
-        
-        const formatDateOnly = (dateStr) => {
-             if(!dateStr) return '';
-             return new Date(dateStr).toLocaleDateString('ar-EG');
-        };
-        
-        const formatDate = (dateStr) => {
-             if(!dateStr) return '';
-             return new Date(dateStr).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' });
-        };
-        
+        const formatDateOnly = (dateStr) => dateStr ? new Date(dateStr).toLocaleDateString('ar-EG') : '';
+        const formatDate = (dateStr) => dateStr ? new Date(dateStr).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' }) : '';
         const formatTimeOnly = (dateStr) => {
              if(!dateStr) return '';
              const d = new Date(dateStr);
@@ -1003,6 +994,15 @@
                            )}
                            {txn.clientRating > 0 && (
                                <span className="text-yellow-400 flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-yellow-950/30 px-2 py-1 rounded border border-yellow-900/50"><i className="ph-fill ph-star text-sm"></i> {txn.clientRating}/5</span>
+                           )}
+                           {txn.viewedByClient ? (
+                               <span className="text-blue-400 flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-blue-950/30 px-2 py-1 rounded border border-blue-900/50" title={`تمت المشاهدة في: ${formatDate(txn.viewTime)}`}>
+                                   <i className="ph ph-checks text-sm sm:text-base"></i> تمت المشاهدة
+                               </span>
+                           ) : (
+                               <span className="text-slate-500 flex items-center gap-1 text-[10px] sm:text-xs bg-slate-800/50 px-2 py-1 rounded border border-slate-700" title="لم يتم فتح الرابط بعد">
+                                   <i className="ph ph-check text-sm sm:text-base"></i> لم يُشاهد
+                               </span>
                            )}
                            <span className="bg-slate-800 text-slate-400 text-xs px-2 py-1 rounded border border-slate-700 font-mono">#{txn.receiptNo}</span>
                         </div>
