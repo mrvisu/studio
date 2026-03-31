@@ -132,8 +132,8 @@
           welcomeBack: "أهلاً بك أ. {name} من جديد في {studio} 🌟! سعيدين جداً بثقتك المستمرة وعودتك لتوثيق ذكرياتك معنا. تم تسجيل طلبك بنجاح.\nتفاصيل الطلب: {services}\nالإجمالي: {total} ج.م\nالباقي: {remaining} ج.م",
           vipDiscount: "مرحباً بك أ. {name} 🌟\nبصفتك من عملائنا المميزين في {studio}، يسعدنا أن نقدم لك خصم خاص بنسبة 10% على زيارتك القادمة كهدية بسيطة وتقديراً لثقتك المستمرة بنا! 🎁✨\nننتظرك دائماً لتسجيل أجمل ذكرياتك.",
           invoice: "أهلاً بك أ. {name} 👋\nنورتنا وشرفتنا في {studio} 📸✨\n\n🧾 فاتورة إلكترونية\n----------------------------------\n🧾 رقم الإيصال: {receipt}\n📅 التاريخ: {date}\n⏰ الوقت: {time}\n----------------------------------\n🛠️ المطلوب بالتفصيل:\n{services}\n----------------------------------\n💰 إجمالي الحساب: {total} ج.م\n✅ المدفوع: {paid} ج.م\n🔴 الباقي: {remaining} ج.م\n----------------------------------\n📍 لمتابعة حالة طلبك خطوة بخطوة، تفضل بزيارة الرابط التالي:\n{track_url}\n\nشكراً لثقتكم بنا!",
-          reminder: "مرحباً أ. {name} 🌟. نود تذكيركم بأن هناك مبلغ متبقي لحسابكم في {studio} بقيمة {remaining} ج.م. \nرقم الإيصال: {receipt}.",
-          ready: "أهلاً أ. {name} 🎉. الطلب الخاص بك جاهز للاستلام في {studio}! \nباقي الحساب: {remaining} ج.م. نورتنا وشرفتنا!",
+          reminder: "مرحباً بك أ. {name} 🌟\nيسعدنا تواصلك معنا من {studio}. نود تذكيرك بلطف بأن هناك مبلغاً متبقياً لحسابكم بقيمة {remaining} ج.م (رقم الإيصال: #{receipt}).\n\nلراحتك، يمكنك سداد المبلغ إلكترونياً أو متابعة تفاصيل وفاتورة طلبك عبر الرابط التالي:\n{track_url}\n\nشكراً لثقتك بنا، ونسعد دائماً بخدمتك! 📸✨",
+          ready: "أهلاً بك أ. {name} 🎉\nيسعدنا إبلاغك بأن طلبك (إيصال #{receipt}) قد اكتمل وهو الآن جاهز للاستلام في {studio}!\n\nإجمالي المبلغ المتبقي: {remaining} ج.م.\n\nيمكنك مراجعة تفاصيل طلبك، رؤية الفاتورة، وتتبع حالته من خلال الرابط التالي:\n{track_url}\n\nننتظر زيارتك بكل ود، وشكراً لاختيارك لنا! 📸✨",
           deposit: "تم استلام عربون بقيمة {paid} ج.م من أ. {name} في {studio} 💸. \nإجمالي الطلب: {total} ج.م \nالمتبقي: {remaining} ج.م. شكراً لك!",
           tracking: "مرحباً أ. {name} 👋\nيمكنك الآن متابعة مراحل تجهيز طلبك (إيصال #{receipt}) لحظة بلحظة عبر الرابط التالي:\n{track_url}\n\n💡 متاح سداد باقي الحساب إلكترونياً (إنستاباي/محافظ).\nشرفتنا في {studio} 📸✨"
         };
@@ -1985,25 +1985,25 @@
                    </div>
                    <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
                       <h2 className="text-xl font-bold mb-4 flex justify-between text-slate-100 border-b border-slate-800 pb-4">
-                       <span>مصروفات اليوم</span>
-                       <span className="text-red-400 text-sm bg-red-950/40 px-3 py-1 rounded border border-red-900/50">الإجمالي: {formatCurrency(todaysExpenses.reduce((s,e)=>s+e.amount,0))}</span>
-                     </h2>
-                     <div className="space-y-3">
-                       {todaysExpenses.length === 0 ? <p className="text-slate-500 text-center p-6 bg-slate-950 rounded-xl border border-slate-800 border-dashed">لم يتم تسجيل مصروفات اليوم.</p> : todaysExpenses.map(exp => (
-                         <div key={exp.id} className="flex justify-between items-center p-4 bg-slate-950 rounded-xl border border-slate-800">
-                           <div>
-                               <p className="font-bold text-slate-200">{exp.category} <span className="text-red-400 mr-2">{exp.amount} ج.م</span></p>
-                               {exp.notes && <p className="text-xs text-slate-500 mt-1">{exp.notes}</p>}
-                               <p className="text-xs text-slate-600 mt-2 font-mono">{formatDate(exp.date)}</p>
-                           </div>
-                           <button onClick={async () => {
-                               const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
-                               await deleteDoc(doc(db, `artifacts/${appId}/public/data/expenses`, exp.id));
-                           }} className="text-slate-500 hover:text-red-400 p-2"><i className="ph ph-trash text-xl"></i></button>
-                         </div>
-                       ))}
-                     </div>
-                   </div>
+                        <span>مصروفات اليوم</span>
+                        <span className="text-red-400 text-sm bg-red-950/40 px-3 py-1 rounded border border-red-900/50">الإجمالي: {formatCurrency(todaysExpenses.reduce((s,e)=>s+e.amount,0))}</span>
+                      </h2>
+                      <div className="space-y-3">
+                        {todaysExpenses.length === 0 ? <p className="text-slate-500 text-center p-6 bg-slate-950 rounded-xl border border-slate-800 border-dashed">لم يتم تسجيل مصروفات اليوم.</p> : todaysExpenses.map(exp => (
+                          <div key={exp.id} className="flex justify-between items-center p-4 bg-slate-950 rounded-xl border border-slate-800">
+                            <div>
+                                <p className="font-bold text-slate-200">{exp.category} <span className="text-red-400 mr-2">{exp.amount} ج.م</span></p>
+                                {exp.notes && <p className="text-xs text-slate-500 mt-1">{exp.notes}</p>}
+                                <p className="text-xs text-slate-600 mt-2 font-mono">{formatDate(exp.date)}</p>
+                            </div>
+                            <button onClick={async () => {
+                                const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
+                                await deleteDoc(doc(db, `artifacts/${appId}/public/data/expenses`, exp.id));
+                            }} className="text-slate-500 hover:text-red-400 p-2"><i className="ph ph-trash text-xl"></i></button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                 </div>
 
                 <div className="xl:col-span-1">
@@ -2030,7 +2030,7 @@
                                
                                <div className="flex items-center justify-between bg-slate-900 p-1.5 rounded-xl border border-slate-700 shadow-inner mb-4">
                                   <button type="button" onClick={()=>updateInventory(itemName, -1)} className="text-red-400 hover:bg-slate-800 hover:text-red-300 w-8 h-8 rounded-lg flex items-center justify-center transition-colors"><i className="ph ph-minus text-base font-bold"></i></button>
-                                  <span className="font-black text-2xl text-white tracking-wider">{currentStock}</span>
+                                  <span className="font-bold text-2xl text-white tracking-wider">{currentStock}</span>
                                   <button type="button" onClick={()=>updateInventory(itemName, 1)} className="text-green-400 hover:bg-slate-800 hover:text-green-300 w-8 h-8 rounded-lg flex items-center justify-center transition-colors"><i className="ph ph-plus text-base font-bold"></i></button>
                                </div>
 
@@ -2421,6 +2421,7 @@
                         <code className="text-blue-400 font-bold mx-1 bg-slate-900 px-2 py-1 rounded border border-slate-700 mt-2 inline-block shadow-sm">{'{date}'}</code>
                         <code className="text-blue-400 font-bold mx-1 bg-slate-900 px-2 py-1 rounded border border-slate-700 mt-2 inline-block shadow-sm">{'{time}'}</code>
                         <code className="text-purple-400 font-bold mx-1 bg-slate-900 px-2 py-1 rounded border border-slate-700 mt-2 inline-block shadow-sm">{'{studio}'}</code>
+                        <code className="text-green-400 font-bold mx-1 bg-slate-900 px-2 py-1 rounded border border-slate-700 mt-2 inline-block shadow-sm">{'{track_url}'}</code>
                      </p>
                   </div>
 
@@ -2573,6 +2574,7 @@
                 if (!data.waTemplates) {
                     data.waTemplates = DEFAULT_WA_TEMPLATES;
                 } else {
+                    // Update fallback dynamically if database versions differ
                     data.waTemplates = { ...DEFAULT_WA_TEMPLATES, ...data.waTemplates };
                 }
                 
