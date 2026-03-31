@@ -132,8 +132,8 @@
           welcomeBack: "أهلاً بك أ. {name} من جديد في {studio} 🌟! سعيدين جداً بثقتك المستمرة وعودتك لتوثيق ذكرياتك معنا. تم تسجيل طلبك بنجاح.\nتفاصيل الطلب: {services}\nالإجمالي: {total} ج.م\nالباقي: {remaining} ج.م",
           vipDiscount: "مرحباً بك أ. {name} 🌟\nبصفتك من عملائنا المميزين في {studio}، يسعدنا أن نقدم لك خصم خاص بنسبة 10% على زيارتك القادمة كهدية بسيطة وتقديراً لثقتك المستمرة بنا! 🎁✨\nننتظرك دائماً لتسجيل أجمل ذكرياتك.",
           invoice: "أهلاً بك أ. {name} 👋\nنورتنا وشرفتنا في {studio} 📸✨\n\n🧾 فاتورة إلكترونية\n----------------------------------\n🧾 رقم الإيصال: {receipt}\n📅 التاريخ: {date}\n⏰ الوقت: {time}\n----------------------------------\n🛠️ المطلوب بالتفصيل:\n{services}\n----------------------------------\n💰 إجمالي الحساب: {total} ج.م\n✅ المدفوع: {paid} ج.م\n🔴 الباقي: {remaining} ج.م\n----------------------------------\n📍 لمتابعة حالة طلبك خطوة بخطوة، تفضل بزيارة الرابط التالي:\n{track_url}\n\nشكراً لثقتكم بنا!",
-          reminder: "مرحباً أ. {name} 🌟. نود تذكيركم بأن هناك مبلغ متبقي لحسابكم في {studio} بقيمة {remaining} ج.م. \nرقم الإيصال: {receipt}.",
-          ready: "أهلاً أ. {name} 🎉. الطلب الخاص بك جاهز للاستلام في {studio}! \nباقي الحساب: {remaining} ج.م. نورتنا وشرفتنا!",
+          reminder: "مرحباً أ. {name} 🌟\nنأمل أن تكونوا بخير.\nنود تذكيركم بلطف بأنه يتبقى مبلغ لحسابكم في {studio} بقيمة {remaining} ج.م 💳.\n\nلتفاصيل الإيصال ورابط الدفع الإلكتروني المباشر (إنستاباي / محافظ)، يرجى زيارة الرابط التالي:\n{track_url}\n\nنسعد دائماً بخدمتكم وتوثيق أجمل لحظاتكم! ✨",
+          ready: "أهلاً أ. {name} 🎉. الطلب الخاص بك جاهز للاستلام في {studio}! \nباقي الحساب: {remaining} ج.م.\nرابط الطلب:\n{track_url}",
           deposit: "تم استلام عربون بقيمة {paid} ج.م من أ. {name} في {studio} 💸. \nإجمالي الطلب: {total} ج.م \nالمتبقي: {remaining} ج.م. شكراً لك!",
           tracking: "مرحباً أ. {name} 👋\nيمكنك الآن متابعة مراحل تجهيز طلبك (إيصال #{receipt}) لحظة بلحظة عبر الرابط التالي:\n{track_url}\n\n💡 متاح سداد باقي الحساب إلكترونياً (إنستاباي/محافظ).\nشرفتنا في {studio} 📸✨"
         };
@@ -1059,14 +1059,9 @@
                         {(txn.photosLink || (txn.uploadedPhotos && txn.uploadedPhotos.length > 0)) && (
                             <button onClick={(e) => { e.stopPropagation(); openWhatsApp(txn.phone, `أهلاً ${displayName} 👋\nصورك جاهزة للتحميل بجودة عالية! يمكنك تحميلها وحفظها من هذا الرابط:\n${window.location.href.split('?')[0]}?phone=${encodeURIComponent(txn.phone)}&receipt=${encodeURIComponent(txn.receiptNo)}&type=${isWedding ? 'w' : 't'}`); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-green-400 hover:bg-slate-700 font-bold border-b border-slate-700 flex items-center gap-2"><i className="ph ph-download-simple"></i> إرسال رابط الصور</button>
                         )}
-                        {isRepeat && (
-                            <button onClick={(e) => { e.stopPropagation(); openWhatsApp(txn.phone, generateWA_Message('vipDiscount', txn, settings, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-pink-400 hover:bg-slate-700 font-bold">🎁 إرسال هدية خصم (VIP)</button>
-                        )}
-                        {isRepeat ? (
-                            <button onClick={(e) => { e.stopPropagation(); openWhatsApp(txn.phone, generateWA_Message('welcomeBack', txn, settings, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-yellow-400 hover:bg-slate-700 font-bold">🌟 ترحيب بالعودة</button>
-                        ) : (
-                            <button onClick={(e) => { e.stopPropagation(); openWhatsApp(txn.phone, generateWA_Message('welcome', txn, settings, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-slate-200 hover:bg-slate-700">👋 رسالة ترحيب</button>
-                        )}
+                        {isRepeat && <button onClick={(e) => { e.stopPropagation(); openWhatsApp(txn.phone, generateWA_Message('vipDiscount', txn, settings, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-pink-400 hover:bg-slate-700 font-bold">🎁 خصم (VIP)</button>}
+                        <button onClick={(e) => { e.stopPropagation(); openWhatsApp(txn.phone, generateWA_Message('welcomeBack', txn, settings, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-yellow-400 hover:bg-slate-700 font-bold">🌟 ترحيب بالعودة</button>
+                        <button onClick={(e) => { e.stopPropagation(); openWhatsApp(txn.phone, generateWA_Message('welcome', txn, settings, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-slate-200 hover:bg-slate-700">👋 رسالة ترحيب</button>
                         <button onClick={(e) => { e.stopPropagation(); openWhatsApp(txn.phone, generateWA_Message('ready', txn, settings, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-slate-200 hover:bg-slate-700">🎉 الشغل خلص</button>
                         <button onClick={(e) => { e.stopPropagation(); openWhatsApp(txn.phone, generateWA_Message('reminder', txn, settings, isWedding)); setShowWaMenu(false);}} className="text-right px-3 py-2 text-sm text-slate-200 hover:bg-slate-700">⚠️ تذكير بالباقي</button>
                       </div>
@@ -1303,10 +1298,11 @@
                                 <h4 className="text-sm font-bold text-yellow-400 mb-3 flex items-center gap-2"><i className="ph-fill ph-folder-open text-lg"></i> السجل السابق للعميل ({pastRecords.length} زيارات)</h4>
                                 <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-1">
                                     {pastRecords.map(r => (
-                                        <div key={r.id} className="bg-slate-950 p-3 rounded-lg border border-slate-800 flex flex-col sm:flex-row sm:justify-between sm:items-center text-xs gap-2 cursor-pointer hover:border-blue-500/50 transition-colors" onClick={() => window.open(`?phone=${encodeURIComponent(r.phone)}&receipt=${encodeURIComponent(r.receiptNo)}&type=${r.type === 'wedding' ? 'w' : 't'}`, '_blank')} title="فتح تفاصيل الإيصال">
+                                        <div key={r.id} className="bg-slate-950 p-3 rounded-lg border border-slate-800 flex flex-col sm:flex-row sm:justify-between sm:items-center text-xs gap-2 cursor-pointer hover:border-blue-500/50 transition-colors" onClick={() => window.open(`?phone=${encodeURIComponent(r.phone)}&receipt=${encodeURIComponent(r.receiptNo)}&type=${r.type === 'wedding' ? 'w' : 't'}`, '_blank')} title="فتح تفاصيل الإيصال في نافذة جديدة">
                                             <div>
                                                 <span className={`font-bold ml-2 ${r.type === 'wedding' ? 'text-pink-400' : 'text-blue-400'}`}>{r.type === 'wedding' ? 'حجز زفاف' : 'جلسة تصوير'}</span>
                                                 <span className="text-slate-500 font-mono">{formatDateOnly(r.dateTime)}</span>
+                                                <span className="text-slate-600 font-mono text-[10px] mr-2">#{r.receiptNo}</span>
                                             </div>
                                             <div className="flex gap-4 w-full sm:w-auto justify-between sm:justify-end">
                                                 <span className="text-slate-300">الإجمالي: {r.total}</span>
@@ -1875,7 +1871,7 @@
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <StatCard title="التحصيل العام (استوديو + زفاف)" value={totalCollectedAll} color="blue" highlight />
                   <StatCard title="إجمالي المصروفات" value={expensesTotal} color="red" highlight />
-                  <StatCard title="صافي الربح الفعلي" value={netProfit} color={netProfit >= 0 ? "emerald" : "rose"} highlight />
+                  <StatCard title="صاف الربح الفعلي" value={netProfit} color={netProfit >= 0 ? "emerald" : "rose"} highlight />
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1902,7 +1898,7 @@
                               </div>
                               <div className="flex items-center gap-1.5 w-full sm:w-auto">
                                 <span className="text-red-400 font-bold text-xs ml-auto sm:ml-2">{txn.remaining} ج.م</span>
-                                <button onClick={() => openWhatsApp(txn.phone, `مرحباً أ. ${txn.clientName} 🌟\nتذكير بمبلغ متبقي لحسابكم في ${settings.studioName} بقيمة ${txn.remaining} ج.م.\nيمكن التحويل فودافون كاش أو إنستاباي على رقم: 01126810107`)} className="bg-green-600 hover:bg-green-500 text-white p-1.5 rounded-lg text-sm transition-colors" title="إرسال تذكير عبر الواتس"><i className="ph ph-whatsapp-logo text-base"></i></button>
+                                <button onClick={() => openWhatsApp(txn.phone, generateWA_Message('reminder', txn, settings, false))} className="bg-green-600 hover:bg-green-500 text-white p-1.5 rounded-lg text-sm transition-colors" title="إرسال تذكير عبر الواتس"><i className="ph ph-whatsapp-logo text-base"></i></button>
                               </div>
                             </div>
                           ))}
@@ -1934,7 +1930,7 @@
                               </div>
                               <div className="flex items-center gap-1.5 w-full sm:w-auto">
                                 <span className="text-red-400 font-bold text-xs ml-auto sm:ml-2">{txn.remaining} ج.م</span>
-                                <button onClick={() => openWhatsApp(txn.phone, `مرحباً العريس ${txn.groomName} 🌟\nتذكير بمبلغ متبقي لحجز الزفاف في ${settings.studioName} بقيمة ${txn.remaining} ج.م.\nيمكن التحويل فودافون كاش أو إنستاباي على رقم: 01126810107`)} className="bg-green-600 hover:bg-green-500 text-white p-1.5 rounded-lg text-sm transition-colors" title="إرسال تذكير عبر الواتس"><i className="ph ph-whatsapp-logo text-base"></i></button>
+                                <button onClick={() => openWhatsApp(txn.phone, generateWA_Message('reminder', txn, settings, true))} className="bg-green-600 hover:bg-green-500 text-white p-1.5 rounded-lg text-sm transition-colors" title="إرسال تذكير عبر الواتس"><i className="ph ph-whatsapp-logo text-base"></i></button>
                               </div>
                             </div>
                           ))}
@@ -2297,6 +2293,12 @@
                 if (!data.expenseCategories || data.expenseCategories.length < 5) data.expenseCategories = DEFAULT_EXPENSE_CATEGORIES;
                 if (!data.waTemplates) data.waTemplates = DEFAULT_WA_TEMPLATES;
                 else data.waTemplates = { ...DEFAULT_WA_TEMPLATES, ...data.waTemplates };
+                
+                // Force update old reminder template
+                if (data.waTemplates.reminder === "رابط الدفع وتفاصيل الحساب:\n{track_url}") {
+                    data.waTemplates.reminder = DEFAULT_WA_TEMPLATES.reminder;
+                }
+                
                 if (data.waTemplates.invoice && !data.waTemplates.invoice.includes('{track_url}')) data.waTemplates.invoice = DEFAULT_WA_TEMPLATES.invoice;
                 if (!data.adminPassword) data.adminPassword = '1234';
                 setSettings(data);
