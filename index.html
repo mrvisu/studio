@@ -907,11 +907,6 @@
                                    <i className="ph-fill ph-check-circle text-sm"></i> سداد مديونية
                                </span>
                            )}
-                           {txn.photosLink && (
-                               <span className="text-green-400 flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-green-950/30 px-2 py-1 rounded border border-green-900/50" title="مرفق صور للتحميل">
-                                   <i className="ph-fill ph-link text-sm"></i> يوجد صور
-                               </span>
-                           )}
                            {isRepeat && (
                                <span className="text-yellow-400 flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-yellow-950/30 px-2 py-1 rounded border border-yellow-900/50" title="عميل دائم">
                                    <i className="ph-fill ph-star text-sm"></i> عميل مميز ({visitCount})
@@ -1052,7 +1047,7 @@
             );
         };
 
-        const TopCustomers = ({ allRecords }) => {
+        const TopCustomers = ({ allRecords, onCustomerClick }) => {
             const currentMonth = new Date().getMonth() + 1;
             const currentYear = new Date().getFullYear();
 
@@ -1089,9 +1084,9 @@
                     </h2>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                         {topCustomers.map((cust, idx) => (
-                            <div key={idx} className="bg-slate-950 p-4 rounded-xl border border-yellow-500/20 flex flex-col items-center text-center shadow-inner relative overflow-hidden group hover:border-yellow-500/50 transition-colors">
+                            <div key={idx} onClick={() => onCustomerClick && onCustomerClick(cust.phone)} className="bg-slate-950 p-4 rounded-xl border border-yellow-500/20 flex flex-col items-center text-center shadow-inner relative overflow-hidden group hover:border-yellow-500/50 transition-colors cursor-pointer" title="اضغط لعرض كل طلبات هذا العميل">
                                 {idx === 0 && <div className="absolute top-0 right-0 bg-yellow-500 text-slate-900 text-[10px] font-black px-2 py-0.5 rounded-bl-lg z-10">المركز 1</div>}
-                                <div className="w-10 h-10 bg-yellow-500/10 text-yellow-500 rounded-full flex items-center justify-center mb-2">
+                                <div className="w-10 h-10 bg-yellow-500/10 text-yellow-500 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                                     <i className="ph-fill ph-star text-xl"></i>
                                 </div>
                                 <span className="font-bold text-slate-200 text-sm truncate w-full">{cust.name}</span>
@@ -1265,7 +1260,6 @@
                 } else { setLoyaltyAlert(''); }
             };
 
-            // Filtering logic
             let displayTxns = transactions;
             const isFiltering = query !== '' || filterDate !== '';
             
@@ -1289,7 +1283,6 @@
                 });
             }
 
-            // Calculation for Daily collected money strictly based on payment dates
             const targetDateForTotal = filterDate ? new Date(filterDate).toDateString() : new Date().toDateString();
             const currentTotalCollected = displayTxns.reduce((sum, txn) => {
                 if (txn.paymentHistory && txn.paymentHistory.length > 0) {
@@ -1330,7 +1323,7 @@
                   </div>
                 </div>
 
-                {isFiltering ? null : <TopCustomers allRecords={allRecords} />}
+                {isFiltering ? null : <TopCustomers allRecords={allRecords} onCustomerClick={(phone) => setQuery(phone)} />}
                   
                 <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
                   <h2 className="text-xl font-bold mb-4 flex items-center justify-between text-slate-100 border-b border-slate-800 pb-4">
@@ -2605,30 +2598,6 @@
                 await setDoc(doc(db, `artifacts/${appId}/public/data/inventory`, 'main'), newInv);
             };
 
-            useEffect(() => {
-                if (isTracking && dataLoaded) {
-                    const targetArr = trackType === 'w' ? weddings : transactions;
-                    const currentTxn = targetArr.find(t => t.phone === trackPhone && t.receiptNo.toString() === trackReceipt);
-                    
-                    if (!currentTxn) {
-                        const timer = setTimeout(() => setShowNotFound(true), 2500);
-                        return () => clearTimeout(timer);
-                    } else {
-                        setShowNotFound(false);
-                        const runClientCleanup = async () => {
-                             const updatedTxn = await checkAndCleanExpiredPhotos(currentTxn, db, storage);
-                             if (!updatedTxn.viewedByClient) {
-                                 const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
-                                 const targetCol = trackType === 'w' ? 'weddings' : 'transactions';
-                                 const finalTxn = { ...updatedTxn, viewedByClient: true, viewTime: new Date().toISOString() };
-                                 setDoc(doc(db, `artifacts/${appId}/public/data/${targetCol}`, finalTxn.id), finalTxn).catch(err => console.error(err));
-                             }
-                        };
-                        runClientCleanup();
-                    }
-                }
-            }, [isTracking, dataLoaded, transactions, weddings, trackPhone, trackReceipt, trackType]);
-
             if (!authReady) {
                 return (
                     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-100 p-6 text-center">
@@ -2642,7 +2611,7 @@
                 const targetArr = trackType === 'w' ? weddings : transactions;
                 const txn = targetArr.find(t => t.phone === trackPhone && t.receiptNo.toString() === trackReceipt);
 
-                if (!dataLoaded || (!txn && !showNotFound)) {
+                if (!dataLoaded) {
                     return (
                         <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-100 p-6 text-center">
                             <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -2652,7 +2621,7 @@
                     );
                 }
                 
-                if (!txn && showNotFound) {
+                if (!txn) {
                     return (
                         <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 p-6 text-center">
                             <i className="ph ph-magnifying-glass text-6xl mb-4 text-slate-600"></i>
@@ -2663,7 +2632,12 @@
                     );
                 }
                 
-                return <TrackingView txn={txn} trackType={trackType} db={db} settings={settings} setReceiptImageModal={setReceiptImageModal} />;
+                return (
+                    <>
+                        <TrackingView txn={txn} trackType={trackType} db={db} settings={settings} setReceiptImageModal={setReceiptImageModal} />
+                        <ReceiptModal imageUrl={receiptImageModal} onClose={() => setReceiptImageModal(null)} />
+                    </>
+                );
             }
 
             if (!isAuthenticatedAdmin) {
