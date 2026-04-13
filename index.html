@@ -2967,6 +2967,7 @@
                 )}
               </main>
               
+              <TxnDetailsModal txnDetailsModal={txnDetailsModal} setTxnDetailsModal={setTxnDetailsModal} setReceiptImageModal={setReceiptImageModal} db={db} allRecords={allRecords} />
               <ReceiptModal imageUrl={receiptImageModal} onClose={() => setReceiptImageModal(null)} />
             </div>
           );
