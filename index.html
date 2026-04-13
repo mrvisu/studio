@@ -730,7 +730,7 @@
             const customerHistory = allRecords ? allRecords.filter(t => t.phone === txnDetailsModal.phone && t.id !== txnDetailsModal.id).sort((a,b) => new Date(b.dateTime) - new Date(a.dateTime)) : [];
 
             return (
-              <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setTxnDetailsModal(null)}>
+              <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-[80] p-4" onClick={() => setTxnDetailsModal(null)}>
                 <div className="bg-slate-900 p-6 rounded-3xl shadow-xl border border-slate-800 w-full max-w-lg relative max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={e => e.stopPropagation()}>
                   <button onClick={() => setTxnDetailsModal(null)} className="absolute top-4 left-4 p-2 text-slate-500 hover:text-red-400 transition-colors"><i className="ph ph-x text-2xl"></i></button>
                   
@@ -1357,7 +1357,7 @@
                                     <p className="text-center text-slate-500 py-6 bg-slate-950 rounded-xl border border-slate-800 border-dashed">لا توجد ديون مطابقة للبحث.</p>
                                 ) : (
                                     filteredDebts.map(txn => (
-                                        <div key={txn.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 bg-slate-950 rounded-2xl border border-slate-800 gap-4 hover:border-red-500/30 transition-all shadow-sm mb-3">
+                                        <div key={txn.id} onClick={() => setTxnDetailsModal(txn)} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 bg-slate-950 rounded-2xl border border-slate-800 gap-4 hover:border-red-500/30 transition-all shadow-sm mb-3 cursor-pointer">
                                             <div>
                                                 <span className={`font-bold text-sm ${txn.type === 'wedding' ? 'text-pink-300' : 'text-slate-200'}`}>
                                                     {txn.type === 'wedding' ? `${txn.groomName || ''} و ${txn.brideName || ''}` : txn.clientName}
@@ -1375,10 +1375,10 @@
                                                     {txn.remaining} ج.م
                                                 </span>
                                                 <div className="flex flex-wrap gap-2 justify-end">
-                                                    <button onClick={() => { setPayModal({...txn, paymentType: 'cash'}); setShowDebtsModal(false); }} className="bg-yellow-600 hover:bg-yellow-500 text-slate-900 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1.5">
+                                                    <button onClick={(e) => { e.stopPropagation(); setPayModal({...txn, paymentType: 'cash'}); setShowDebtsModal(false); }} className="bg-yellow-600 hover:bg-yellow-500 text-slate-900 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1.5">
                                                         <i className="ph ph-money text-base"></i> نقدي
                                                     </button>
-                                                    <button onClick={() => { setPayModal({...txn, paymentType: 'electronic'}); setShowDebtsModal(false); }} className="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1.5">
+                                                    <button onClick={(e) => { e.stopPropagation(); setPayModal({...txn, paymentType: 'electronic'}); setShowDebtsModal(false); }} className="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1.5">
                                                         <i className="ph ph-wallet text-base"></i> إلكتروني
                                                     </button>
                                                     <button onClick={(e) => { e.stopPropagation(); openWhatsApp(txn.phone, generateWA_Message('reminder', txn, settings, txn.type === 'wedding')); }} className="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1.5" title="إرسال تذكير عبر واتساب">
@@ -1787,7 +1787,7 @@
                                     <p className="text-center text-slate-500 py-6 bg-slate-950 rounded-xl border border-slate-800 border-dashed">لا توجد ديون مطابقة للبحث.</p>
                                 ) : (
                                     filteredDebts.map(txn => (
-                                        <div key={txn.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 bg-slate-950 rounded-2xl border border-slate-800 gap-4 hover:border-red-500/30 transition-all shadow-sm mb-3">
+                                        <div key={txn.id} onClick={() => setTxnDetailsModal(txn)} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 bg-slate-950 rounded-2xl border border-slate-800 gap-4 hover:border-red-500/30 transition-all shadow-sm mb-3 cursor-pointer">
                                             <div>
                                                 <span className="font-bold text-sm text-pink-300">
                                                     {`${txn.groomName || ''} و ${txn.brideName || ''}`}
@@ -1804,12 +1804,11 @@
                                                 <span className="text-red-400 font-black text-sm bg-red-950/30 px-3 py-1.5 rounded-lg border border-red-900/30 ml-auto sm:ml-4">
                                                     {txn.remaining} ج.م
                                                 </span>
-                                                {/* أزرار السداد بالإضافة لزر التذكير الواتساب */}
                                                 <div className="flex flex-wrap gap-2 justify-end">
-                                                    <button onClick={() => { setPayModal({...txn, paymentType: 'cash'}); setShowDebtsModal(false); }} className="bg-yellow-600 hover:bg-yellow-500 text-slate-900 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1.5">
+                                                    <button onClick={(e) => { e.stopPropagation(); setPayModal({...txn, paymentType: 'cash'}); setShowDebtsModal(false); }} className="bg-yellow-600 hover:bg-yellow-500 text-slate-900 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1.5">
                                                         <i className="ph ph-money text-base"></i> نقدي
                                                     </button>
-                                                    <button onClick={() => { setPayModal({...txn, paymentType: 'electronic'}); setShowDebtsModal(false); }} className="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1.5">
+                                                    <button onClick={(e) => { e.stopPropagation(); setPayModal({...txn, paymentType: 'electronic'}); setShowDebtsModal(false); }} className="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1.5">
                                                         <i className="ph ph-wallet text-base"></i> إلكتروني
                                                     </button>
                                                     <button onClick={(e) => { e.stopPropagation(); openWhatsApp(txn.phone, generateWA_Message('reminder', txn, settings, txn.type === 'wedding')); }} className="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1.5" title="إرسال تذكير عبر واتساب">
@@ -2477,6 +2476,7 @@
           const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
           const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
           const [isAuthenticatedAdmin, setIsAuthenticatedAdmin] = useState(false);
+          
           const [receiptImageModal, setReceiptImageModal] = useState(null);
           const [txnDetailsModal, setTxnDetailsModal] = useState(null);
 
@@ -2722,6 +2722,16 @@
                               </div>
                           )}
 
+                          {displayReqs && displayReqs !== 'لا يوجد تفاصيل' && (
+                              <div className="bg-slate-950/80 p-3.5 rounded-xl mb-4 border border-slate-800 flex flex-col gap-2 text-sm shadow-inner">
+                                  <span className="text-slate-300 font-bold flex items-center gap-1.5">
+                                      <i className={`ph-fill ph-list-dashes text-lg ${isWedding ? 'text-pink-400' : 'text-blue-400'}`}></i>
+                                      الخدمات والتفاصيل المطلوبة:
+                                  </span>
+                                  <p className="text-slate-400 font-medium whitespace-pre-wrap leading-relaxed">{displayReqs}</p>
+                              </div>
+                          )}
+
                           <div className="flex justify-between bg-slate-950 p-4 rounded-2xl border border-slate-800 text-sm">
                                <div className="flex flex-col items-center gap-1">
                                    <span className="text-slate-500 text-xs">المدفوع</span>
@@ -2863,10 +2873,10 @@
                               نسعى دائماً لتقديم الأفضل لكم. كيف كانت تجربتكم معنا؟ يسعدنا سماع رأيكم أو أي ملاحظات لتطوير خدماتنا.
                           </p>
                           
-                          {feedbackSubmitted ? (
+                          {feedbackSubmitted || txn.clientRating > 0 ? (
                               <div className="bg-green-950/40 border border-green-500/30 p-4 rounded-xl text-center">
                                   <i className="ph-fill ph-check-circle text-4xl text-green-500 mb-2"></i>
-                                  <p className="text-green-400 font-bold">شكراً لك! تم حفظ وإرسال تقييمك بنجاح للإدارة.</p>
+                                  <p className="text-green-400 font-bold">شكراً لك! تم حفظ وإرسال تقييمك بنجاح.</p>
                               </div>
                           ) : (
                               <>
