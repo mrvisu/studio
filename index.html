@@ -2938,8 +2938,8 @@
           const [user, setUser] = useState(null);
           const [authReady, setAuthReady] = useState(false);
           const [authError, setAuthError] = useState(null);
-          const [dataLoaded, setDataLoaded] = useState(false);
-          const [showNotFound, setShowNotFound] = useState(false);
+          const [txnsLoaded, setTxnsLoaded] = useState(false);
+          const [wedsLoaded, setWedsLoaded] = useState(false);
           const [transferReceipt, setTransferReceipt] = useState(null);
           const [isUploading, setIsUploading] = useState(false);
           const [isUploadingProfilePic, setIsUploadingProfilePic] = useState(false);
@@ -3036,20 +3036,20 @@
               const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
               data.sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
               setTransactions(data);
-              setDataLoaded(true);
+              setTxnsLoaded(true);
             }, (err) => {
               console.error("Transactions error", err);
-              setDataLoaded(true);
+              setTxnsLoaded(true);
             });
 
             const unsubWeds = onSnapshot(collection(db, basePath, 'weddings'), (snapshot) => {
               const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
               data.sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
               setWeddings(data);
-              setDataLoaded(true);
+              setWedsLoaded(true);
             }, (err) => {
               console.error("Weddings error", err);
-              setDataLoaded(true);
+              setWedsLoaded(true);
             });
 
             if(!isTracking) {
@@ -3100,16 +3100,14 @@
               await setDoc(doc(db, `artifacts/${appId}/public/data/inventory`, 'main'), newInv);
           };
 
+          const isTargetLoaded = trackType === 'w' ? wedsLoaded : txnsLoaded;
+
           useEffect(() => {
-              if (isTracking && dataLoaded) {
+              if (isTracking && isTargetLoaded) {
                   const targetArr = trackType === 'w' ? weddings : transactions;
-                  const currentTxn = targetArr.find(t => t.phone === trackPhone && t.receiptNo && t.receiptNo.toString() === trackReceipt);
+                  const currentTxn = targetArr.find(t => (t.phone||'').trim() === trackPhone.trim() && t.receiptNo && t.receiptNo.toString() === trackReceipt.trim());
                   
-                  if (!currentTxn) {
-                      const timer = setTimeout(() => setShowNotFound(true), 2500);
-                      return () => clearTimeout(timer);
-                  } else {
-                      setShowNotFound(false);
+                  if (currentTxn && !currentTxn.viewedByClient) {
                       const runClientCleanup = async () => {
                            const updatedTxn = await checkAndCleanExpiredPhotos(currentTxn, db, storage);
                            if (!updatedTxn.viewedByClient) {
@@ -3122,13 +3120,13 @@
                       runClientCleanup();
                   }
               }
-          }, [isTracking, dataLoaded, transactions, weddings, trackPhone, trackReceipt, trackType]);
+          }, [isTracking, isTargetLoaded, transactions, weddings, trackPhone, trackReceipt, trackType]);
 
           if (isTracking && authReady) {
               const targetArr = trackType === 'w' ? weddings : transactions;
-              const txn = targetArr.find(t => t.phone === trackPhone && t.receiptNo && t.receiptNo.toString() === trackReceipt);
+              const txn = targetArr.find(t => (t.phone||'').trim() === trackPhone.trim() && t.receiptNo && t.receiptNo.toString() === trackReceipt.trim());
 
-              if (!dataLoaded || (!txn && !showNotFound)) {
+              if (!isTargetLoaded) {
                   return (
                       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-100 p-6 text-center">
                           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -3138,7 +3136,7 @@
                   );
               }
               
-              if (!txn && showNotFound) {
+              if (!txn) {
                   return (
                       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 p-6 text-center">
                           <i className="ph ph-magnifying-glass text-6xl mb-4 text-slate-600"></i>
