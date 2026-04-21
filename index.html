@@ -71,6 +71,14 @@
         .animate-fadeIn {
             animation: fadeIn 0.3s ease-out forwards;
         }
+        
+        @keyframes bounce-slow {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .animate-bounce-slow {
+            animation: bounce-slow 2s infinite ease-in-out;
+        }
     </style>
 </head>
 <body>
@@ -133,6 +141,12 @@
 
         const DEFAULT_EXPENSE_CATEGORIES = [
           "أحبار وطباعة", "ورق صور", "صيانة كاميرات/معدات", "إيجار الاستوديو", "كهرباء ومرافق", "رواتب مساعدين", "ألبومات زفاف", "براويز وتابلوهات", "هدايا للعملاء", "مصاريف زفاف أخرى", "نثريات"
+        ];
+
+        const DEFAULT_PROMOTIONS = [
+          { id: '1', title: 'خصم التابلوهات', shortDesc: 'خصم 15% على جميع التابلوهات الخشب', fullDesc: 'استمتع بخصم 15% عند طلب أي تابلوه خشب مقاس 30x40 أو أكبر. زيّن جدرانك بأجمل ذكرياتك.', discount: 'خصم 15%', icon: 'ph-image', color: 'amber' },
+          { id: '2', title: 'عرض ألبومات الزفاف', shortDesc: 'خصم 20% على الألبومات الميني', fullDesc: 'لأن ذكرياتك تهمنا، احصل على ألبوم ميني إضافي بخصم 20% عند استلام صور زفافك لتشاركه مع عائلتك.', discount: 'خصم 20%', icon: 'ph-book-open', color: 'pink' },
+          { id: '3', title: 'جلسات التصوير', shortDesc: 'صورة كارت هدية', fullDesc: 'عند حجز جلسة تصوير كاجوال، احصل على صورة كارت 15x20 مطبوعة مجاناً كهدية من الاستوديو.', discount: 'هدية مجانية', icon: 'ph-camera', color: 'blue' }
         ];
 
         const DEFAULT_WA_TEMPLATES = {
@@ -728,6 +742,118 @@
             );
         };
 
+        const PromotionsSettingsList = ({title, items, onAdd, onRemove}) => {
+            const [newTitle, setNewTitle] = useState('');
+            const [newShortDesc, setNewShortDesc] = useState('');
+            const [newFullDesc, setNewFullDesc] = useState('');
+            const [newDiscount, setNewDiscount] = useState('');
+            const [newIcon, setNewIcon] = useState('ph-gift');
+            const [newColor, setNewColor] = useState('yellow');
+
+            const handleEditClick = (item, idx) => {
+                setNewTitle(item.title); setNewShortDesc(item.shortDesc); setNewFullDesc(item.fullDesc); setNewDiscount(item.discount); setNewIcon(item.icon); setNewColor(item.color); onRemove(idx);
+            };
+
+            const handleSave = () => {
+                if(newTitle && newShortDesc){
+                    onAdd({ id: Date.now().toString(), title: newTitle, shortDesc: newShortDesc, fullDesc: newFullDesc, discount: newDiscount, icon: newIcon, color: newColor });
+                    setNewTitle(''); setNewShortDesc(''); setNewFullDesc(''); setNewDiscount(''); setNewIcon('ph-gift'); setNewColor('yellow');
+                }
+            };
+
+            return (
+              <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
+                <h3 className="font-bold text-slate-100 mb-4 border-b border-slate-800 pb-2">{title}</h3>
+                <div className="flex flex-col gap-3 mb-5 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input type="text" value={newTitle} onChange={e=>setNewTitle(e.target.value)} className="p-3 border border-slate-700 bg-slate-900 text-white rounded-lg outline-none focus:border-yellow-500 placeholder-slate-500 text-sm" placeholder="عنوان العرض (مثال: عرض ألبومات الزفاف)..."/>
+                    <input type="text" value={newShortDesc} onChange={e=>setNewShortDesc(e.target.value)} className="p-3 border border-slate-700 bg-slate-900 text-white rounded-lg outline-none focus:border-yellow-500 placeholder-slate-500 text-sm" placeholder="وصف قصير (مثال: خصم 20% على الألبومات الميني)..."/>
+                  </div>
+                  <textarea value={newFullDesc} onChange={e=>setNewFullDesc(e.target.value)} className="p-3 border border-slate-700 bg-slate-900 text-white rounded-lg outline-none focus:border-yellow-500 placeholder-slate-500 text-sm resize-none" rows="2" placeholder="وصف تفصيلي يظهر عند الضغط (اختياري)..."></textarea>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                     <input type="text" value={newDiscount} onChange={e=>setNewDiscount(e.target.value)} className="p-3 border border-slate-700 bg-slate-900 text-white rounded-lg outline-none focus:border-yellow-500 placeholder-slate-500 text-sm" placeholder="قيمة الخصم (مثال: 15%)..."/>
+                     <select value={newIcon} onChange={e=>setNewIcon(e.target.value)} className="p-3 border border-slate-700 bg-slate-900 text-white rounded-lg outline-none focus:border-yellow-500 text-sm font-mono">
+                         <option value="ph-gift">🎁 هدية (ph-gift)</option>
+                         <option value="ph-image">🖼️ تابلوه (ph-image)</option>
+                         <option value="ph-book-open">📖 ألبوم (ph-book-open)</option>
+                         <option value="ph-camera">📸 كاميرا (ph-camera)</option>
+                         <option value="ph-star">⭐ نجمة (ph-star)</option>
+                     </select>
+                     <select value={newColor} onChange={e=>setNewColor(e.target.value)} className="p-3 border border-slate-700 bg-slate-900 text-white rounded-lg outline-none focus:border-yellow-500 text-sm">
+                         <option value="yellow">أصفر (ذهبي)</option>
+                         <option value="pink">وردي (زفاف)</option>
+                         <option value="blue">أزرق (تصوير)</option>
+                         <option value="amber">برتقالي (عروض)</option>
+                     </select>
+                  </div>
+                  <button onClick={handleSave} className="w-full bg-yellow-600 hover:bg-yellow-500 text-slate-900 font-black py-3 rounded-lg transition-colors flex items-center justify-center gap-2 mt-2"><i className="ph-bold ph-plus"></i> إضافة قالب العرض</button>
+                </div>
+                <div className="flex flex-col gap-3 overflow-y-auto max-h-[400px] custom-scrollbar pr-2">
+                  {items.map((item, idx) => {
+                    const colorStyles = {
+                        yellow: 'border-yellow-500/30 bg-yellow-950/20 text-yellow-400',
+                        pink: 'border-pink-500/30 bg-pink-950/20 text-pink-400',
+                        blue: 'border-blue-500/30 bg-blue-950/20 text-blue-400',
+                        amber: 'border-amber-500/30 bg-amber-950/20 text-amber-400'
+                    };
+                    const curColor = colorStyles[item.color || 'yellow'];
+                    return (
+                    <div key={idx} className={`p-4 rounded-xl flex flex-col gap-2 border relative group hover:opacity-90 transition-opacity ${curColor}`}>
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-2 font-black text-base">
+                            <i className={`ph-fill ${item.icon || 'ph-gift'} text-xl`}></i> {item.title}
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={()=>handleEditClick(item, idx)} className="text-white bg-slate-800 hover:bg-slate-700 p-1.5 rounded-lg transition-colors"><i className="ph ph-pencil-simple text-base"></i></button>
+                            <button onClick={()=>onRemove(idx)} className="text-red-400 bg-slate-800 hover:bg-slate-700 p-1.5 rounded-lg transition-colors"><i className="ph ph-trash text-base"></i></button>
+                        </div>
+                      </div>
+                      <p className="text-sm font-bold opacity-90">{item.shortDesc}</p>
+                      {item.fullDesc && <p className="text-xs opacity-70 mt-1 line-clamp-2">{item.fullDesc}</p>}
+                      {item.discount && <span className="mt-2 self-start bg-slate-900 text-white px-2 py-1 rounded text-xs font-bold shadow-sm">{item.discount}</span>}
+                    </div>
+                  )})}
+                  {items.length === 0 && <p className="text-center text-slate-500 py-4 text-sm">لا توجد عروض مضافة بعد.</p>}
+                </div>
+              </div>
+            );
+        };
+
+        const PromoSelector = ({ settings, selectedPromos, onChange }) => {
+            const togglePromo = (promoId) => {
+                if (selectedPromos.includes(promoId)) {
+                    onChange(selectedPromos.filter(id => id !== promoId));
+                } else {
+                    onChange([...selectedPromos, promoId]);
+                }
+            };
+            
+            if (!settings.promotions || settings.promotions.length === 0) return null;
+
+            return (
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 mb-4">
+                    <label className="text-sm font-bold text-yellow-400 mb-3 block"><i className="ph-fill ph-gift text-yellow-400 text-lg align-middle"></i> العروض المخصصة لهذا العميل (اختياري):</label>
+                    <p className="text-xs text-slate-500 mb-3">اختر العروض التي ستظهر للعميل في صفحة التتبع الخاصة به.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {settings.promotions.map(promo => {
+                            const isSelected = selectedPromos.includes(promo.id);
+                            return (
+                                <div key={promo.id} onClick={() => togglePromo(promo.id)} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${isSelected ? 'bg-yellow-950/30 border-yellow-500 shadow-inner' : 'bg-slate-900 border-slate-700 hover:border-yellow-500/50'}`}>
+                                    <div className={`mt-0.5 w-5 h-5 rounded flex items-center justify-center border shrink-0 ${isSelected ? 'bg-yellow-500 border-yellow-500 text-slate-900' : 'bg-slate-800 border-slate-600 text-transparent'}`}>
+                                        <i className="ph-bold ph-check text-xs"></i>
+                                    </div>
+                                    <div className="flex flex-col flex-1">
+                                        <span className={`font-bold text-sm ${isSelected ? 'text-yellow-400' : 'text-slate-300'}`}>{promo.title}</span>
+                                        <span className="text-xs text-slate-500 mt-0.5">{promo.shortDesc}</span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        };
+
         const PaymentModal = ({ payModal, setPayModal, db }) => {
             if (!payModal) return null;
             const handleSubmit = async (e) => {
@@ -1012,6 +1138,11 @@
                            {txn.photosLink && (
                                <span className="text-green-400 flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-green-950/30 px-2 py-1 rounded border border-green-900/50" title="مرفق رابط للصور">
                                    <i className="ph-fill ph-link text-sm"></i> يوجد رابط
+                               </span>
+                           )}
+                           {txn.selectedPromos && txn.selectedPromos.length > 0 && (
+                               <span className="text-yellow-400 flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-yellow-950/30 px-2 py-1 rounded border border-yellow-900/50" title="عروض مخصصة محددة">
+                                   <i className="ph-fill ph-gift text-sm"></i> محدد له عرض
                                </span>
                            )}
                            {isRepeat && (
@@ -1427,7 +1558,7 @@
             const [showAddModal, setShowAddModal] = useState(false);
             const [showDebtsModal, setShowDebtsModal] = useState(false);
             const [isEditing, setIsEditing] = useState(false);
-            const [formData, setFormData] = useState({ clientName: '', phone: '', photoNo: [{number: '', note: '', needsName: false}], writeNameOnPhoto: false, requirements: '', total: '', paid: '', paymentMethod: 'cash', soldProducts: [], photosLink: '' });
+            const [formData, setFormData] = useState({ clientName: '', phone: '', photoNo: [{number: '', note: '', needsName: false}], writeNameOnPhoto: false, requirements: '', total: '', paid: '', paymentMethod: 'cash', soldProducts: [], photosLink: '', selectedPromos: [] });
             const [loyaltyAlert, setLoyaltyAlert] = useState('');
             const [query, setQuery] = useState('');
             const [debtSearch, setDebtSearch] = useState('');
@@ -1466,7 +1597,8 @@
                     electronicPaid: txn.electronicPaid || 0,
                     paymentMethod: txn.electronicPaid > 0 ? 'electronic' : 'cash',
                     soldProducts: txn.soldProducts || [],
-                    photosLink: txn.photosLink || ''
+                    photosLink: txn.photosLink || '',
+                    selectedPromos: txn.selectedPromos || []
                 });
                 setIsEditing(true);
                 setShowAddModal(true);
@@ -1513,6 +1645,7 @@
                 month: isEditing ? formData.month : new Date().getMonth() + 1,
                 year: isEditing ? formData.year : new Date().getFullYear(),
                 photosLink: formData.photosLink || '',
+                selectedPromos: formData.selectedPromos || [],
                 payments: isEditing ? (formData.payments || []) : initialPayment 
               };
               
@@ -1535,7 +1668,7 @@
               }
               
               if(!isEditing) setSettings({...settings, nextReceiptNo: finalReceiptNo + 1});
-              setFormData({ clientName: '', phone: '', photoNo: [{number: '', note: '', needsName: false}], writeNameOnPhoto: false, requirements: '', total: '', paid: '', paymentMethod: 'cash', soldProducts: [], photosLink: '' });
+              setFormData({ clientName: '', phone: '', photoNo: [{number: '', note: '', needsName: false}], writeNameOnPhoto: false, requirements: '', total: '', paid: '', paymentMethod: 'cash', soldProducts: [], photosLink: '', selectedPromos: [] });
               setIsEditing(false);
               setShowAddModal(false);
             };
@@ -1611,7 +1744,7 @@
               <div className="space-y-6">
                 
                 <div className={"grid grid-cols-1 gap-3 bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-800 items-stretch " + (totalDebts > 0 ? "lg:grid-cols-4 sm:grid-cols-2" : "lg:grid-cols-3 sm:grid-cols-3")}>
-                  <button onClick={() => { setIsEditing(false); setFormData({ clientName: '', phone: '', photoNo: [{number: '', note: '', needsName: false}], writeNameOnPhoto: false, requirements: '', total: '', paid: '', paymentMethod: 'cash', soldProducts: [], photosLink: '' }); setShowAddModal(true); }} className="w-full h-12 sm:h-14 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-900/50 text-sm sm:text-base">
+                  <button onClick={() => { setIsEditing(false); setFormData({ clientName: '', phone: '', photoNo: [{number: '', note: '', needsName: false}], writeNameOnPhoto: false, requirements: '', total: '', paid: '', paymentMethod: 'cash', soldProducts: [], photosLink: '', selectedPromos: [] }); setShowAddModal(true); }} className="w-full h-12 sm:h-14 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-900/50 text-sm sm:text-base">
                     <i className="ph ph-plus-circle text-xl sm:text-2xl"></i> إضافة عملية
                   </button>
                   
@@ -1786,6 +1919,9 @@
                                 </button>
                             </div>
                         </div>
+
+                        <PromoSelector settings={settings} selectedPromos={formData.selectedPromos} onChange={(selected) => setFormData({...formData, selectedPromos: selected})} />
+
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mb-5">
                           {settings.services.map((srv, idx) => {
                             const srvObj = typeof srv === 'string' ? {name: srv, price: 0, desc: ''} : srv;
@@ -1845,7 +1981,7 @@
                 groomName: '', brideName: '', phone: '', groomAddress: '',
                 weddingDate: '', location: '', makeupArtist: '', leaveTime: '',
                 sessionType: '', casualShootDate: '',
-                packages: [], addons: [],
+                packages: [], addons: [], selectedPromos: [],
                 photoNo: [{number: '', note: '', needsName: false}], writeNameOnPhoto: false,
                 total: '', paid: '', paymentMethod: 'cash', photosLink: ''
             });
@@ -1931,6 +2067,7 @@
                     casualShootDate: txn.casualShootDate || '',
                     packages: txn.packages || (txn.package ? [txn.package] : []),
                     addons: txn.addons || [],
+                    selectedPromos: txn.selectedPromos || [],
                     photoNo: Array.isArray(txn.photoNo) ? txn.photoNo.map(p => typeof p === 'string' ? {number: p, note: '', needsName: false} : p) : (txn.photoNo ? txn.photoNo.split(',').map(s=>({number: s.trim(), note: '', needsName: false})) : [{number: '', note: '', needsName: false}]),
                     writeNameOnPhoto: txn.writeNameOnPhoto || false,
                     total: txn.total || '',
@@ -1984,6 +2121,7 @@
                 casualShootDate: formData.casualShootDate,
                 packages: formData.packages,
                 addons: formData.addons,
+                selectedPromos: formData.selectedPromos || [],
                 photoNo: formData.photoNo.filter(p => p.number && p.number.trim() !== ''),
                 writeNameOnPhoto: formData.writeNameOnPhoto,
                 total: total,
@@ -2001,7 +2139,7 @@
               await setDoc(doc(db, `artifacts/${appId}/public/data/weddings`, newWedding.id), newWedding);
               
               if(!isEditing) setSettings({...settings, nextReceiptNo: finalReceiptNo + 1});
-              setFormData({ groomName:'', brideName:'', phone:'', groomAddress:'', weddingDate:'', location:'', makeupArtist:'', leaveTime:'', sessionType:'', casualShootDate:'', packages:[], addons:[], photoNo: [{number: '', note: '', needsName: false}], writeNameOnPhoto: false, total:'', paid:'', paymentMethod:'cash', photosLink:'' });
+              setFormData({ groomName:'', brideName:'', phone:'', groomAddress:'', weddingDate:'', location:'', makeupArtist:'', leaveTime:'', sessionType:'', casualShootDate:'', packages:[], addons:[], selectedPromos:[], photoNo: [{number: '', note: '', needsName: false}], writeNameOnPhoto: false, total:'', paid:'', paymentMethod:'cash', photosLink:'' });
               setIsEditing(false);
               setShowAddModal(false);
             };
@@ -2077,7 +2215,7 @@
 
             const handleDayClick = (dateStr) => {
                 setIsEditing(false);
-                setFormData({ groomName:'', brideName:'', phone:'', groomAddress:'', weddingDate: dateStr, location:'', makeupArtist:'', leaveTime:'', sessionType:'', casualShootDate:'', packages:[], addons:[], photoNo: [{number: '', note: '', needsName: false}], writeNameOnPhoto: false, total:'', paid:'', paymentMethod:'cash', photosLink:'' });
+                setFormData({ groomName:'', brideName:'', phone:'', groomAddress:'', weddingDate: dateStr, location:'', makeupArtist:'', leaveTime:'', sessionType:'', casualShootDate:'', packages:[], addons:[], selectedPromos:[], photoNo: [{number: '', note: '', needsName: false}], writeNameOnPhoto: false, total:'', paid:'', paymentMethod:'cash', photosLink:'' });
                 setShowAddModal(true);
             };
 
@@ -2087,7 +2225,7 @@
                 {!isFiltering && <WeddingScheduleView weddings={weddings} onEventClick={setTxnDetailsModal} onDayClick={handleDayClick} />}
                 
                 <div className={"grid grid-cols-1 gap-3 bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-800 items-stretch " + (totalDebts > 0 ? "lg:grid-cols-4 sm:grid-cols-2" : "lg:grid-cols-3 sm:grid-cols-3")}>
-                  <button onClick={() => { setIsEditing(false); setFormData({ groomName:'', brideName:'', phone:'', groomAddress:'', weddingDate:'', location:'', makeupArtist:'', leaveTime:'', sessionType:'', casualShootDate:'', packages:[], addons:[], photoNo: [{number: '', note: '', needsName: false}], writeNameOnPhoto: false, total:'', paid:'', paymentMethod:'cash', photosLink:'' }); setShowAddModal(true); }} className="w-full h-12 sm:h-14 bg-pink-600 hover:bg-pink-500 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-pink-900/50 text-sm sm:text-base">
+                  <button onClick={() => { setIsEditing(false); setFormData({ groomName:'', brideName:'', phone:'', groomAddress:'', weddingDate:'', location:'', makeupArtist:'', leaveTime:'', sessionType:'', casualShootDate:'', packages:[], addons:[], selectedPromos:[], photoNo: [{number: '', note: '', needsName: false}], writeNameOnPhoto: false, total:'', paid:'', paymentMethod:'cash', photosLink:'' }); setShowAddModal(true); }} className="w-full h-12 sm:h-14 bg-pink-600 hover:bg-pink-500 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-pink-900/50 text-sm sm:text-base">
                     <i className="ph ph-heart text-xl sm:text-2xl"></i> حجز زفاف جديد
                   </button>
 
@@ -2292,6 +2430,8 @@
                             </div>
                         </div>
 
+                        <PromoSelector settings={settings} selectedPromos={formData.selectedPromos} onChange={(selected) => setFormData({...formData, selectedPromos: selected})} />
+
                         <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
                            <h4 className="text-sm font-bold text-pink-400 mb-3 border-b border-slate-800 pb-2">اختيار الباقات الأساسية (يمكنك اختيار أكثر من باقة)</h4>
                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -2391,6 +2531,7 @@
 
         const ExpensesTab = ({ settings, expenses, inventory, db }) => {
             const [expData, setExpData] = useState({ amount: '', category: settings.expenseCategories[0], notes: '', type: 'studio' });
+            const [showMonthModal, setShowMonthModal] = useState(false);
             
             const handleAddExpense = async (e) => {
               e.preventDefault();
@@ -2401,6 +2542,15 @@
             };
 
             const todaysExpenses = expenses.filter(e => new Date(e.date).toDateString() === new Date().toDateString());
+            
+            // New logic to calculate Today's and This Month's Expenses
+            const today = new Date();
+            const todayTotalExp = todaysExpenses.reduce((sum, e) => sum + e.amount, 0);
+            const thisMonthExpenses = expenses.filter(e => {
+                const d = new Date(e.date);
+                return d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+            });
+            const monthTotalExp = thisMonthExpenses.reduce((sum, e) => sum + e.amount, 0);
             
             const inventoryItemsList = useMemo(() => {
                const basicItems = [{name: "ورق طباعة صور"}, {name: "أحبار طابعة"}];
@@ -2417,6 +2567,29 @@
             return (
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 <div className="xl:col-span-2 space-y-6">
+                   
+                   {/* Summary Cards */}
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                       <div className="bg-gradient-to-l from-red-950/40 to-slate-900 border border-red-900/50 p-5 rounded-2xl flex items-center justify-between shadow-inner">
+                           <div>
+                               <p className="text-slate-400 text-sm font-bold">مصروفات اليوم</p>
+                               <p className="text-2xl font-black text-red-400 mt-1">{formatCurrency(todayTotalExp)}</p>
+                           </div>
+                           <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center text-red-400 border border-red-500/30">
+                               <i className="ph-fill ph-calendar-blank text-2xl"></i>
+                           </div>
+                       </div>
+                       <div onClick={() => setShowMonthModal(true)} className="bg-gradient-to-l from-red-950/40 to-slate-900 border border-red-900/50 p-5 rounded-2xl flex items-center justify-between shadow-inner cursor-pointer hover:border-red-500/30 hover:bg-red-950/20 transition-all group">
+                           <div>
+                               <p className="text-slate-400 text-sm font-bold group-hover:text-slate-300">مصروفات الشهر الحالي</p>
+                               <p className="text-2xl font-black text-red-400 mt-1">{formatCurrency(monthTotalExp)}</p>
+                           </div>
+                           <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center text-red-400 border border-red-500/30 group-hover:scale-110 transition-transform">
+                               <i className="ph-fill ph-calendar-check text-2xl"></i>
+                           </div>
+                       </div>
+                   </div>
+
                    <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
                      <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-100 border-b border-slate-800 pb-4"><i className="ph ph-money text-red-400 text-2xl"></i> تسجيل مصروفات</h2>
                      <form onSubmit={handleAddExpense} className="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -2444,10 +2617,10 @@
                        <button type="submit" className="sm:col-span-4 w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg shadow-md transition-all flex items-center justify-center gap-2"><i className="ph ph-plus-circle text-xl"></i> إضافة المصروف</button>
                      </form>
                    </div>
+                   
                    <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
-                      <h2 className="text-xl font-bold mb-4 flex justify-between text-slate-100 border-b border-slate-800 pb-4">
-                        <span>مصروفات اليوم</span>
-                        <span className="text-red-400 text-sm bg-red-950/40 px-3 py-1 rounded border border-red-900/50">الإجمالي: {formatCurrency(todaysExpenses.reduce((s,e)=>s+e.amount,0))}</span>
+                      <h2 className="text-xl font-bold mb-4 flex justify-between items-center text-slate-100 border-b border-slate-800 pb-4">
+                        <span>سجل مصروفات اليوم</span>
                       </h2>
                       <div className="space-y-3">
                         {todaysExpenses.length === 0 ? <p className="text-slate-500 text-center p-6 bg-slate-950 rounded-xl border border-slate-800 border-dashed">لم يتم تسجيل مصروفات اليوم.</p> : todaysExpenses.map(exp => (
@@ -2522,6 +2695,46 @@
                       </div>
                    </div>
                 </div>
+
+                {showMonthModal && (
+                    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowMonthModal(false)}>
+                        <div className="bg-slate-900 p-6 rounded-3xl shadow-xl border border-slate-800 w-full max-w-2xl relative max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                            <button onClick={() => setShowMonthModal(false)} className="absolute top-4 left-4 p-2 text-slate-500 hover:text-red-400 transition-colors z-10"><i className="ph ph-x text-2xl"></i></button>
+                            
+                            <h3 className="text-xl font-black mb-4 border-b border-slate-800 pb-4 text-red-400 flex items-center justify-between shrink-0 pr-8 sm:pr-0">
+                                <div className="flex items-center gap-2">
+                                    <i className="ph-fill ph-calendar-check text-2xl"></i> تفاصيل مصروفات الشهر الحالي
+                                </div>
+                                <span className="text-sm bg-red-950/50 px-3 py-1 rounded-lg border border-red-900/50 hidden sm:block">{formatCurrency(monthTotalExp)}</span>
+                            </h3>
+                            
+                            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
+                                {thisMonthExpenses.length === 0 ? (
+                                    <p className="text-slate-500 text-center py-6 bg-slate-950 rounded-xl border border-slate-800 border-dashed">لم يتم تسجيل مصروفات هذا الشهر.</p>
+                                ) : (
+                                    thisMonthExpenses.map(exp => (
+                                        <div key={exp.id} className="flex justify-between items-center p-4 bg-slate-950 rounded-xl border border-slate-800 hover:border-red-500/30 transition-colors">
+                                            <div>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <p className="font-bold text-slate-200">{exp.category} <span className="text-red-400 mr-2">{exp.amount} ج.م</span></p>
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${exp.type === 'wedding' ? 'bg-pink-900/40 text-pink-400 border border-pink-500/30' : 'bg-blue-900/40 text-blue-400 border border-blue-500/30'}`}>
+                                                        {exp.type === 'wedding' ? 'زفاف' : 'استوديو'}
+                                                    </span>
+                                                </div>
+                                                {exp.notes && <p className="text-xs text-slate-500 mt-1">{exp.notes}</p>}
+                                                <p className="text-xs text-slate-600 mt-2 font-mono">{formatDate(exp.date)}</p>
+                                            </div>
+                                            <button onClick={async () => {
+                                                const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
+                                                await deleteDoc(doc(db, `artifacts/${appId}/public/data/expenses`, exp.id));
+                                            }} className="text-slate-500 hover:text-red-400 p-2 transition-colors"><i className="ph ph-trash text-xl"></i></button>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
               </div>
             );
         };
@@ -2849,6 +3062,10 @@
                    <ServicesSettingsList title="باقات الزفاف الأساسية" items={settings.weddingPackages || []} onAdd={v => handleAddList('weddingPackages', v)} onRemove={i => handleRemoveList('weddingPackages', i)} colorTheme="pink" />
                    <ServicesSettingsList title="قوالب إضافات الزفاف (حنة، كتب كتاب...)" items={settings.addonTemplates || []} onAdd={v => handleAddList('addonTemplates', v)} onRemove={i => handleRemoveList('addonTemplates', i)} colorTheme="pink" />
                 </div>
+
+                <div className="grid grid-cols-1 gap-6">
+                    <PromotionsSettingsList title="قوالب العروض الترويجية المخصصة (للعملاء)" items={settings.promotions || []} onAdd={v => handleAddList('promotions', v)} onRemove={i => handleRemoveList('promotions', i)} />
+                </div>
                 
                 <div>
                     <div className="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
@@ -2963,7 +3180,7 @@
           const [expenses, setExpenses] = useState([]);
           const [inventory, setInventory] = useState({});
           const [settings, setSettings] = useState({
-            nextReceiptNo: 1000, adminPassword: '1234', studioPhone: '01201260040', enableNotifications: false, services: DEFAULT_SERVICES, products: DEFAULT_PRODUCTS, weddingPackages: DEFAULT_WEDDING_PACKAGES, addonTemplates: DEFAULT_ADDON_TEMPLATES, expenseCategories: DEFAULT_EXPENSE_CATEGORIES, waTemplates: DEFAULT_WA_TEMPLATES, studioName: "Mrakby Studio", studioLogo: ""
+            nextReceiptNo: 1000, adminPassword: '1234', studioPhone: '01201260040', enableNotifications: false, services: DEFAULT_SERVICES, products: DEFAULT_PRODUCTS, weddingPackages: DEFAULT_WEDDING_PACKAGES, addonTemplates: DEFAULT_ADDON_TEMPLATES, expenseCategories: DEFAULT_EXPENSE_CATEGORIES, waTemplates: DEFAULT_WA_TEMPLATES, studioName: "Mrakby Studio", studioLogo: "", promotions: DEFAULT_PROMOTIONS
           });
 
           const urlParams = new URLSearchParams(window.location.search);
@@ -3017,6 +3234,7 @@
                     if (!data.weddingPackages) data.weddingPackages = DEFAULT_WEDDING_PACKAGES;
                     if (!data.addonTemplates) data.addonTemplates = DEFAULT_ADDON_TEMPLATES;
                     if (!data.expenseCategories || data.expenseCategories.length < 5) data.expenseCategories = DEFAULT_EXPENSE_CATEGORIES;
+                    if (!data.promotions) data.promotions = DEFAULT_PROMOTIONS;
                     if (!data.waTemplates) data.waTemplates = DEFAULT_WA_TEMPLATES;
                     else data.waTemplates = { ...DEFAULT_WA_TEMPLATES, ...data.waTemplates };
                     if (data.waTemplates.invoice && !data.waTemplates.invoice.includes('{track_url}')) data.waTemplates.invoice = DEFAULT_WA_TEMPLATES.invoice;
@@ -3159,6 +3377,8 @@
                   .sort((a,b) => new Date(b.dateTime) - new Date(a.dateTime));
               
               const existingProfilePic = clientArchiveRecords.find(t => t.clientProfilePic)?.clientProfilePic || null;
+              
+              const clientPromotions = (!txn.selectedPromos || !settings.promotions) ? [] : settings.promotions.filter(p => txn.selectedPromos.includes(p.id));
 
               const handleProfilePicUpload = async (e) => {
                   const file = e.target.files[0];
@@ -3221,42 +3441,48 @@
                       </div>
 
                       {/* 2. البطاقة الإعلانية (Promotional Card) */}
-                      <div 
-                          onClick={() => setShowPromoDetails(!showPromoDetails)}
-                          className={`w-full max-w-md bg-gradient-to-l from-yellow-600 to-amber-500 p-5 rounded-2xl mb-8 shadow-lg shadow-yellow-900/20 text-slate-900 flex flex-col gap-4 relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform border border-yellow-400`}
-                      >
-                          <div className="absolute -right-2 -top-4 text-yellow-100/30">
-                              <i className="ph-fill ph-gift text-6xl transform rotate-12"></i>
-                          </div>
-                          
-                          <div className="flex items-center gap-4 relative z-10">
-                              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center shrink-0 backdrop-blur-sm border border-white/30 shadow-inner">
-                                  <i className="ph-fill ph-ticket text-2xl text-white"></i>
+                      {clientPromotions.length > 0 && (
+                          <div 
+                              onClick={() => setShowPromoDetails(!showPromoDetails)}
+                              className={`w-full max-w-md bg-gradient-to-l from-yellow-600 to-amber-500 p-5 rounded-2xl mb-8 shadow-lg shadow-yellow-900/20 text-slate-900 flex flex-col gap-4 relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform border border-yellow-400`}
+                          >
+                              <div className="absolute -right-2 -top-4 text-yellow-100/30">
+                                  <i className="ph-fill ph-gift text-6xl transform rotate-12"></i>
                               </div>
-                              <div className="flex-1">
-                                  <h3 className="font-black text-lg text-white mb-1">عرض خاص لعملائنا! 🎁</h3>
-                                  <p className="text-[11px] sm:text-xs font-bold text-yellow-50 leading-tight">اضغط هنا لمعرفة التفاصيل والخصم المتاح لك.</p>
+                              
+                              <div className="flex items-center gap-4 relative z-10">
+                                  <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center shrink-0 backdrop-blur-sm border border-white/30 shadow-inner">
+                                      <i className="ph-fill ph-ticket text-2xl text-white animate-bounce-slow"></i>
+                                  </div>
+                                  <div className="flex-1">
+                                      <h3 className="font-black text-lg text-white mb-1">عرض خاص مقدم لك! 🎁</h3>
+                                      <p className="text-[11px] sm:text-xs font-bold text-yellow-50 leading-tight">اضغط هنا لمعرفة التفاصيل والخصم المتاح لك.</p>
+                                  </div>
+                                  <i className={`ph-bold ph-caret-${showPromoDetails ? 'up' : 'down'} text-white text-xl transition-transform`}></i>
                               </div>
-                              <i className={`ph-bold ph-caret-${showPromoDetails ? 'up' : 'down'} text-white text-xl transition-transform`}></i>
-                          </div>
-                          
-                          {/* Details section that expands */}
-                          <div className={`relative z-10 overflow-hidden transition-all duration-300 ease-in-out ${showPromoDetails ? 'max-h-40 opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
-                              <div className="bg-white/20 backdrop-blur-md p-4 rounded-xl border border-white/30 shadow-inner">
-                                  <p className="text-sm font-bold text-white mb-2 leading-relaxed">
-                                      احصل على خصم <span className="text-yellow-900 bg-white px-1.5 py-0.5 rounded shadow-sm mx-1">15%</span> على:
-                                  </p>
-                                  <ul className="text-xs text-yellow-50 font-bold space-y-1.5 pr-1">
-                                      <li className="flex items-center gap-1.5"><i className="ph-fill ph-check-circle"></i> طباعة الألبومات بكل المقاسات.</li>
-                                      <li className="flex items-center gap-1.5"><i className="ph-fill ph-check-circle"></i> طباعة التابلوهات الخشب والبراويز.</li>
-                                      <li className="flex items-center gap-1.5"><i className="ph-fill ph-check-circle"></i> جلسات التصوير القادمة.</li>
-                                  </ul>
-                                  <p className="text-[10px] text-yellow-900 mt-3 font-bold bg-white/40 p-1.5 rounded text-center">
-                                      * يرجى إبراز هذه الشاشة في الاستوديو للحصول على الخصم.
-                                  </p>
+                              
+                              {/* Details section that expands */}
+                              <div className={`relative z-10 overflow-hidden transition-all duration-300 ease-in-out ${showPromoDetails ? 'max-h-[500px] opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
+                                  <div className="bg-white/20 backdrop-blur-md p-4 rounded-xl border border-white/30 shadow-inner flex flex-col gap-3">
+                                      {clientPromotions.map((promo, idx) => (
+                                          <div key={idx} className="bg-white/90 p-3 rounded-lg border border-yellow-200/50 flex flex-col gap-2">
+                                              <div className="flex justify-between items-start">
+                                                  <div className="flex items-center gap-2 font-black text-amber-900">
+                                                      <i className={`ph-fill ${promo.icon || 'ph-gift'} text-xl`}></i> {promo.title}
+                                                  </div>
+                                                  {promo.discount && <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[10px] font-black border border-amber-300">{promo.discount}</span>}
+                                              </div>
+                                              <p className="text-xs text-amber-800 font-bold">{promo.shortDesc}</p>
+                                              {promo.fullDesc && <p className="text-[10px] text-amber-700 leading-relaxed">{promo.fullDesc}</p>}
+                                          </div>
+                                      ))}
+                                      <p className="text-[10px] text-yellow-900 mt-2 font-bold bg-white/40 p-2 rounded-lg text-center">
+                                          * يرجى إبراز هذه الشاشة في الاستوديو للحصول على العروض.
+                                      </p>
+                                  </div>
                               </div>
                           </div>
-                      </div>
+                      )}
 
                       {/* 3. Download Link */}
                       {txn.photosLink && (
@@ -3365,7 +3591,7 @@
                                                  {note && <span className="text-xs text-slate-400 border-t border-slate-800 pt-1.5 mt-0.5"><i className="ph ph-text-aa text-slate-500 ml-1"></i>{note}</span>}
                                              </div>
                                          )
-                                     }) : <span className="font-black text-blue-300 bg-blue-950/50 px-3 py-1.5 rounded-lg border border-blue-900/50 text-center" dir="ltr">{txn.photoNo}</span>}
+                                      }) : <span className="font-black text-blue-300 bg-blue-950/50 px-3 py-1.5 rounded-lg border border-blue-900/50 text-center" dir="ltr">{txn.photoNo}</span>}
                                   </div>
                               </div>
                           )}
