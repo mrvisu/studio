@@ -71,6 +71,13 @@
 
         const { useState, useEffect, useMemo, useCallback } = React;
 
+        // --- Safe LocalStorage Wrappers (Fixes iPhone Crashes) ---
+        const getSafeLocal = (key) => { try { return localStorage.getItem(key); } catch(e) { return null; } };
+        const setSafeLocal = (key, val) => { try { localStorage.setItem(key, val); } catch(e) {} };
+        const removeSafeLocal = (key) => { try { localStorage.removeItem(key); } catch(e) {} };
+        const getSafeSession = (key) => { try { return sessionStorage.getItem(key); } catch(e) { return null; } };
+        const setSafeSession = (key, val) => { try { sessionStorage.setItem(key, val); } catch(e) {} };
+
         // --- Data Definitions ---
         const ORDER_STATUSES = [
           { id: 0, label: 'تم التسجيل', icon: 'ph-clipboard-text', activeClass: 'bg-blue-900/40 text-blue-400 border-blue-500/50 shadow-lg shadow-blue-900/20', inactiveClass: 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800', clientIconCompleted: 'bg-blue-500 text-white shadow-lg shadow-blue-500/40 border-blue-900', clientCardCurrent: 'bg-blue-900/20 border-blue-500/50 shadow-lg shadow-blue-900/20', clientTextCurrent: 'text-blue-400' },
@@ -574,8 +581,8 @@
             useEffect(() => {
                 const recordVisit = async () => {
                     if (!db) return;
-                    if (sessionStorage.getItem('portal_visited')) return;
-                    sessionStorage.setItem('portal_visited', 'true');
+                    if (getSafeSession('portal_visited')) return;
+                    setSafeSession('portal_visited', 'true');
                     try {
                         const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
                         await updateDoc(doc(db, `artifacts/${appId}/public/data/settings`, 'main'), {
@@ -602,7 +609,7 @@
             const handleLike = () => {
                 if(hasLiked) return;
                 setHasLiked(true);
-                localStorage.setItem('studio_liked', 'true');
+                setSafeLocal('studio_liked', 'true');
                 onLikeStudio();
             };
 
@@ -699,34 +706,7 @@
                                     ))}
                                 </div>
 
-                                {/* Customer Reviews Section */}
-                                {reviews.length > 0 && (
-                                    <div className="mb-8">
-                                        <h3 className="text-lg font-black text-slate-200 mb-4 flex items-center justify-center gap-2">
-                                            <i className="ph-fill ph-star text-amber-400"></i> ماذا يقول عملاؤنا عنّا
-                                        </h3>
-                                        <div className="flex overflow-x-auto gap-4 pb-4 hide-scrollbar snap-x custom-scrollbar">
-                                            {reviews.slice(0, 6).map((rev, i) => (
-                                                <div key={i} className="min-w-[260px] sm:min-w-[300px] bg-slate-900/80 backdrop-blur-md border border-slate-700/50 p-5 rounded-2xl shrink-0 snap-center shadow-lg">
-                                                    <div className="flex justify-between items-start mb-3 border-b border-slate-800 pb-3">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-400">
-                                                                <i className="ph-fill ph-user"></i>
-                                                            </div>
-                                                            <span className="font-bold text-sm text-slate-200">{rev.type === 'wedding' ? (rev.groomName + ' و ' + rev.brideName) : rev.clientName}</span>
-                                                        </div>
-                                                        <div className="flex text-amber-400 text-xs" dir="ltr">
-                                                            {[...Array(5)].map((_, j) => <i key={j} className={j < rev.clientRating ? "ph-fill ph-star" : "ph ph-star text-slate-600"}></i>)}
-                                                        </div>
-                                                    </div>
-                                                    <p className="text-xs text-slate-300 line-clamp-3 leading-relaxed italic">
-                                                        {rev.clientFeedback ? `"${rev.clientFeedback}"` : "خدمة ممتازة وتجربة رائعة!"}
-                                                    </p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
+
 
                                 {/* Promotions Section */}
                                 {settings.promotions?.length > 0 && (
@@ -2803,13 +2783,13 @@
           const [previousFeedbackCount, setPreviousFeedbackCount] = useState(0);
 
           useEffect(() => {
-              const savedAuth = localStorage.getItem('studioAdminAuth');
+              const savedAuth = getSafeLocal('studioAdminAuth');
               if (savedAuth === 'true') setIsAuthenticatedAdmin(true);
           }, []);
 
           const handleLogout = () => {
               setIsAuthenticatedAdmin(false);
-              localStorage.removeItem('studioAdminAuth');
+              removeSafeLocal('studioAdminAuth');
               window.location.reload();
           };
 
@@ -2966,11 +2946,11 @@
                       }
 
                       // نظام حماية الجهاز: ربط رابط التتبع بمتصفح العميل لأول مرة فقط
-                      const currentDeviceId = localStorage.getItem('studio_client_device_id') || Math.random().toString(36).substring(2, 15);
+                      const currentDeviceId = getSafeLocal('studio_client_device_id') || Math.random().toString(36).substring(2, 15);
                       
                       if (!currentTxn.boundDeviceId) {
                           // لم يتم ربط الجهاز من قبل، نربطه الآن
-                          localStorage.setItem('studio_client_device_id', currentDeviceId);
+                          setSafeLocal('studio_client_device_id', currentDeviceId);
                           const appId = typeof __app_id !== 'undefined' ? __app_id : 'studio-marakby';
                           const targetCol = trackType === 'w' ? 'weddings' : 'transactions';
                           setDoc(doc(db, `artifacts/${appId}/public/data/${targetCol}`, currentTxn.id), { boundDeviceId: currentDeviceId }, { merge: true }).catch(console.error);
