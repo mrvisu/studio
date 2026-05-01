@@ -397,7 +397,7 @@
 
         // --- UI Components ---
         
-        const MiniProductCard = ({ prod, onClick }) => {
+        const MiniProductCard = ({ prod, onClick, spanTwo }) => {
             const [imgIdx, setImgIdx] = useState(0);
             const images = prod.images?.length > 0 ? prod.images : (prod.img ? [prod.img] : []);
             
@@ -410,9 +410,9 @@
             }, [images.length]);
 
             return (
-                <div onClick={() => onClick(prod)} className="group relative bg-slate-900/80 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-700/50 hover:border-yellow-500/50 transition-all duration-500 overflow-hidden cursor-pointer flex flex-col hover:shadow-[0_8px_30px_rgba(234,179,8,0.15)] hover:-translate-y-1">
+                <div onClick={() => onClick(prod)} className="group relative bg-slate-900/80 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-700/50 hover:border-yellow-500/50 transition-all duration-500 overflow-hidden cursor-pointer flex flex-col hover:shadow-[0_8px_30px_rgba(234,179,8,0.15)] hover:-translate-y-1 h-full">
                     {/* Image Section */}
-                    <div className="relative h-28 sm:h-40 w-full overflow-hidden bg-slate-950">
+                    <div className={`relative ${spanTwo ? 'h-40 sm:h-56' : 'h-28 sm:h-40'} w-full overflow-hidden bg-slate-950 shrink-0`}>
                         {images.map((img, i) => (
                             <img key={i} src={img} className={`absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 ${i === imgIdx ? 'opacity-100 z-10' : 'opacity-0 z-0'}`} alt={prod.title} />
                         ))}
@@ -425,7 +425,7 @@
                     </div>
 
                     {/* Content Section */}
-                    <div className="p-3 sm:p-4 flex flex-col relative z-20">
+                    <div className="p-3 sm:p-4 flex flex-col flex-1 relative z-20">
                         <div className="absolute -top-4 sm:-top-5 right-3 sm:right-4 z-30 bg-gradient-to-r from-yellow-400 to-amber-500 text-slate-950 px-3 sm:px-4 py-1 sm:py-1.5 rounded-xl font-black text-xs sm:text-sm shadow-lg border border-yellow-200/50 flex items-center gap-1.5 transition-transform group-hover:scale-105">
                             <i className="ph-fill ph-tag"></i>
                             {prod.price}
@@ -715,6 +715,31 @@
             const reviews = useMemo(() => allRecords.filter(r => r.clientRating > 0).sort((a,b) => new Date(b.dateTime) - new Date(a.dateTime)), [allRecords]);
             const avgRating = useMemo(() => reviews.length > 0 ? (reviews.reduce((sum, r) => sum + r.clientRating, 0) / reviews.length).toFixed(1) : 0, [reviews]);
 
+            // التحقق من الرابط الخاص بالبطاقة لفتحها تلقائياً وتعديل الـ meta tags قدر الإمكان برمجياً
+            useEffect(() => {
+                const urlParams = new URLSearchParams(window.location.search);
+                const cardId = urlParams.get('card');
+                if (cardId && settings.miniProducts) {
+                    const card = settings.miniProducts.find(p => p.id === cardId);
+                    if (card) setSelectedMiniProd(card);
+                }
+            }, [settings.miniProducts]);
+
+            useEffect(() => {
+                if (selectedMiniProd) {
+                    const title = selectedMiniProd.title + " - " + settings.studioName;
+                    document.title = title;
+                    
+                    const img = selectedMiniProd.images?.[0] || selectedMiniProd.img;
+                    if (img) {
+                        const ogImage = document.querySelector('meta[property="og:image"]');
+                        if (ogImage) ogImage.setAttribute('content', img);
+                    }
+                } else {
+                    document.title = settings.studioName + " - ستوديو المراكبى";
+                }
+            }, [selectedMiniProd, settings.studioName]);
+
             useEffect(() => {
                 setLocalVisits(settings.portalVisits || 1);
             }, [settings.portalVisits]);
@@ -761,14 +786,30 @@
                         await navigator.share({
                             title: settings.studioName,
                             text: 'تابع حالة طلبك واكتشف أحدث العروض من الاستوديو!',
-                            url: window.location.href
+                            url: window.location.href.split('?')[0] + "?client=true"
                         });
                     } catch (err) {
                         console.log('Share canceled or failed', err);
                     }
                 } else {
-                    navigator.clipboard.writeText(window.location.href);
+                    navigator.clipboard.writeText(window.location.href.split('?')[0] + "?client=true");
                     alert("تم نسخ رابط البوابة بنجاح! يمكنك الآن مشاركته.");
+                }
+            };
+
+            const handleShareCard = async () => {
+                const shareUrl = `${window.location.origin}${window.location.pathname}?client=true&card=${selectedMiniProd.id}`;
+                if (navigator.share) {
+                    try {
+                        await navigator.share({
+                            title: selectedMiniProd.title,
+                            text: selectedMiniProd.desc,
+                            url: shareUrl
+                        });
+                    } catch (e) {}
+                } else {
+                    navigator.clipboard.writeText(shareUrl);
+                    alert("تم نسخ رابط البطاقة بنجاح!");
                 }
             };
 
@@ -787,6 +828,18 @@
                     return;
                 }
                 setResults(all); setHasSearched(true);
+            };
+
+            const handleOpenCard = (prod) => {
+                setSelectedMiniProd(prod);
+                const newUrl = `${window.location.pathname}?client=true&card=${prod.id}`;
+                window.history.pushState({}, '', newUrl);
+            };
+
+            const handleCloseCard = () => {
+                setSelectedMiniProd(null);
+                const newUrl = `${window.location.pathname}?client=true`;
+                window.history.pushState({}, '', newUrl);
             };
 
             const promoColors = {
@@ -874,14 +927,17 @@
 
                         {!showPhoneInput && (
                             <div className="w-full mb-8 animate-fadeIn" style={{animationDelay: '0.15s'}}>
-                                {/* Miniature Products Grid (4 Cards) */}
+                                {/* Miniature Products Grid */}
                                 <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
-                                    {displayMiniProducts.map(prod => (
-                                        <MiniProductCard key={prod.id} prod={prod} onClick={setSelectedMiniProd} />
-                                    ))}
+                                    {displayMiniProducts.map((prod, idx) => {
+                                        const isThirdOfThree = displayMiniProducts.length === 3 && idx === 2;
+                                        return (
+                                            <div key={prod.id} className={isThirdOfThree ? 'col-span-2' : ''}>
+                                                <MiniProductCard prod={prod} onClick={handleOpenCard} spanTwo={isThirdOfThree} />
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-
-
 
                                 {/* Promotions Section */}
                                 {settings.promotions?.length > 0 && (
@@ -954,17 +1010,17 @@
                              </div>
                         )}
 
-                        {/* Modal for Mini Product Details */}
+                        {/* Modal for Mini Product Details (Centered) */}
                         {selectedMiniProd && (() => {
                             const imgs = selectedMiniProd.images?.length > 0 ? selectedMiniProd.images : (selectedMiniProd.img ? [selectedMiniProd.img] : []);
                             return (
-                            <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[100] flex p-4 animate-fadeIn" onClick={() => setSelectedMiniProd(null)}>
-                                <div className="bg-slate-900 rounded-3xl max-w-sm w-full overflow-hidden border border-slate-700 shadow-2xl flex flex-col m-auto max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                            <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-fadeIn" onClick={handleCloseCard}>
+                                <div className="bg-slate-900 rounded-3xl max-w-sm w-full overflow-hidden border border-slate-700 shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={e => e.stopPropagation()}>
                                     <div className="relative h-56 sm:h-64 w-full bg-slate-950 shrink-0">
                                         {imgs.map((img, i) => (
                                             <img key={i} src={img} className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${i === miniProdImgIndex ? 'opacity-100' : 'opacity-0'}`} alt={selectedMiniProd.title} />
                                         ))}
-                                        <button onClick={() => setSelectedMiniProd(null)} className="absolute top-4 left-4 bg-slate-900/60 hover:bg-slate-900 text-white w-8 h-8 flex items-center justify-center rounded-full backdrop-blur-md transition-colors border border-white/20 shadow-lg z-10"><i className="ph ph-x text-lg"></i></button>
+                                        <button onClick={handleCloseCard} className="absolute top-4 left-4 bg-slate-900/60 hover:bg-slate-900 text-white w-8 h-8 flex items-center justify-center rounded-full backdrop-blur-md transition-colors border border-white/20 shadow-lg z-10"><i className="ph ph-x text-lg"></i></button>
                                         <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent opacity-80 pointer-events-none"></div>
                                     </div>
                                     <div className="p-6 flex flex-col items-center text-center -mt-10 relative z-10">
@@ -975,6 +1031,9 @@
                                         </div>
                                         <p className="text-slate-300 text-sm leading-relaxed mb-6 bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner w-full">{selectedMiniProd.desc}</p>
                                         
+                                        <button onClick={handleShareCard} className="w-full bg-slate-800 hover:bg-slate-700 text-white font-black py-3 rounded-xl shadow-lg transition-transform hover:scale-[1.02] flex items-center justify-center gap-2 text-sm border border-slate-700 mb-3">
+                                            <i className="ph-fill ph-share-network text-xl"></i> مشاركة هذه البطاقة
+                                        </button>
                                         <button onClick={() => openWhatsApp(settings.studioPhone || '01201260040', `مرحباً ${settings.studioName} 👋\nأود الاستفسار/الحجز بخصوص: *${selectedMiniProd.title}*`)} className="w-full bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 text-white font-black py-4 rounded-xl shadow-lg transition-transform hover:scale-[1.02] flex items-center justify-center gap-2 text-lg border border-green-500/50">
                                             <i className="ph-fill ph-whatsapp-logo text-2xl"></i> طلب عبر واتساب
                                         </button>
@@ -1176,7 +1235,7 @@
             );
         };
 
-        const MiniProductsSettingsList = ({title, items, onAdd, onRemove}) => {
+        const MiniProductsSettingsList = ({title, items, onAdd, onRemove, onUpdateAll}) => {
             const [newTitle, setNewTitle] = useState('');
             const [newDesc, setNewDesc] = useState('');
             const [newPrice, setNewPrice] = useState('');
@@ -1206,6 +1265,20 @@
                 } else {
                     alert("يرجى إدخال اسم البطاقة وإرفاق صورة واحدة على الأقل.");
                 }
+            };
+            
+            const handleMoveUp = (idx) => {
+                if (idx === 0) return;
+                const newItems = [...items];
+                [newItems[idx - 1], newItems[idx]] = [newItems[idx], newItems[idx - 1]];
+                if(onUpdateAll) onUpdateAll(newItems);
+            };
+
+            const handleMoveDown = (idx) => {
+                if (idx === items.length - 1) return;
+                const newItems = [...items];
+                [newItems[idx], newItems[idx + 1]] = [newItems[idx + 1], newItems[idx]];
+                if(onUpdateAll) onUpdateAll(newItems);
             };
 
             return (
@@ -1250,8 +1323,14 @@
                                 </div>
                             </div>
                             <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={()=>handleEditClick(item, idx)} className="text-blue-400 bg-slate-700 hover:bg-slate-600 p-2 rounded-lg transition-colors"><i className="ph ph-pencil-simple text-base"></i></button>
-                                <button onClick={()=>onRemove(idx)} className="text-red-400 bg-slate-700 hover:bg-slate-600 p-2 rounded-lg transition-colors"><i className="ph ph-trash text-base"></i></button>
+                                <div className="flex gap-1">
+                                    <button onClick={()=>handleMoveUp(idx)} disabled={idx===0} className="text-slate-300 bg-slate-700 hover:bg-slate-600 p-1.5 rounded-lg transition-colors disabled:opacity-50"><i className="ph ph-arrow-up text-sm"></i></button>
+                                    <button onClick={()=>handleMoveDown(idx)} disabled={idx===items.length-1} className="text-slate-300 bg-slate-700 hover:bg-slate-600 p-1.5 rounded-lg transition-colors disabled:opacity-50"><i className="ph ph-arrow-down text-sm"></i></button>
+                                </div>
+                                <div className="flex gap-1">
+                                    <button onClick={()=>handleEditClick(item, idx)} className="text-blue-400 bg-slate-700 hover:bg-slate-600 p-1.5 rounded-lg transition-colors flex-1"><i className="ph ph-pencil-simple text-sm"></i></button>
+                                    <button onClick={()=>onRemove(idx)} className="text-red-400 bg-slate-700 hover:bg-slate-600 p-1.5 rounded-lg transition-colors flex-1"><i className="ph ph-trash text-sm"></i></button>
+                                </div>
                             </div>
                         </div>
                     )})}
@@ -2890,6 +2969,7 @@
             const [isSaving, setIsSaving] = useState(false);
             const handleAddList = (key, val) => { if(!val) return; setSettings({...settings, [key]: [...settings[key], val]}); };
             const handleRemoveList = (key, idx) => { const newList = [...settings[key]]; newList.splice(idx, 1); setSettings({...settings, [key]: newList}); };
+            const handleUpdateList = (key, newList) => { setSettings({...settings, [key]: newList}); };
             
             const handleSaveClick = async () => {
                 setIsSaving(true);
@@ -2945,7 +3025,7 @@
                 </div>
                 
                 <div className="grid grid-cols-1 gap-6">
-                   <MiniProductsSettingsList title="بطاقات العرض الرئيسية في بوابة العملاء" items={settings.miniProducts || DEFAULT_MINI_PRODUCTS} onAdd={v => handleAddList('miniProducts', v)} onRemove={i => handleRemoveList('miniProducts', i)} />
+                   <MiniProductsSettingsList title="بطاقات العرض الرئيسية في بوابة العملاء" items={settings.miniProducts || DEFAULT_MINI_PRODUCTS} onAdd={v => handleAddList('miniProducts', v)} onRemove={i => handleRemoveList('miniProducts', i)} onUpdateAll={newList => handleUpdateList('miniProducts', newList)} />
                 </div>
 
                 <div className="grid grid-cols-1 gap-6">
@@ -3579,6 +3659,7 @@
                                   </div>
                               </div>
                               <i className="ph-bold ph-caret-left text-white/50 text-xl relative z-10 shrink-0 mr-2"></i>
+                              {/* Animated Shine Effect */}
                               <div className="absolute top-0 -left-[100%] w-1/2 h-full bg-gradient-to-r from-transparent via-white/20 to-transparent transform skew-x-[-20deg] group-hover:left-[200%] transition-all duration-1000 ease-in-out z-0"></div>
                           </button>
                       </div>
@@ -3763,16 +3844,16 @@
                                                        <span className="font-bold text-sm text-slate-200">إيصال #{record.receiptNo}</span>
                                                    </div>
                                                    <span className="text-xs text-slate-500 font-mono">{formatDateOnly(record.dateTime)}</span>
-                                               </div>
-                                               <div className="flex justify-between items-center mt-3">
+                                              </div>
+                                              <div className="flex justify-between items-center mt-3">
                                                    <span className={`text-xs font-bold px-2.5 py-1 rounded-md flex items-center gap-1 ${recStatusObj.clientIconCompleted.split(' ')[0]} ${recStatusObj.clientIconCompleted.split(' ')[1]} bg-opacity-20 text-opacity-100 border ${recStatusObj.clientIconCompleted.split(' ')[4]}`}>
                                                        <i className={`ph ${recStatusObj.icon}`}></i> {recStatusObj.label}
                                                    </span>
                                                    <span className="text-sm font-black text-slate-300">{record.total} ج.م</span>
-                                               </div>
-                                           </a>
-                                       );
-                                   })}
+                                              </div>
+                                          </a>
+                                      );
+                                  })}
                                </div>
                            </details>
                       </div>
