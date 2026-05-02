@@ -793,19 +793,22 @@
             };
 
             const handleShare = async () => {
+                const shareUrl = window.location.href.split('?')[0] + "?client=true";
+                const shareText = `📸 سجل أجمل لحظاتك مع ${settings.studioName}!\nأحدث عروض التصوير، منتجات حصرية، وأعلى جودة. احجز جلستك الآن واكتشف عالمنا ✨\n\nتصفح العروض من هنا:`;
+                
                 if (navigator.share) {
                     try {
                         await navigator.share({
                             title: settings.studioName,
-                            text: 'تابع حالة طلبك واكتشف أحدث العروض من الاستوديو!',
-                            url: window.location.href.split('?')[0] + "?client=true"
+                            text: shareText,
+                            url: shareUrl
                         });
                     } catch (err) {
                         console.log('Share canceled or failed', err);
                     }
                 } else {
-                    navigator.clipboard.writeText(window.location.href.split('?')[0] + "?client=true");
-                    alert("تم نسخ رابط البوابة بنجاح! يمكنك الآن مشاركته.");
+                    navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+                    alert("تم نسخ الرابط النص التسويقي بنجاح! يمكنك الآن مشاركته.");
                 }
             };
 
@@ -1035,12 +1038,28 @@
                                         </div>
                                         <p className="text-slate-300 text-sm leading-relaxed mb-6 bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner w-full">{selectedMiniProd.desc}</p>
                                         
-                                        <button onClick={() => {
-                                            let msg = `مرحباً ${settings.studioName} 👋\nأود الاستفسار/الحجز بخصوص: *${selectedMiniProd.title}*`;
-                                            openWhatsApp(settings.studioPhone || '01201260040', msg);
-                                        }} className="w-full bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 text-white font-black py-3 rounded-xl shadow-lg transition-transform hover:scale-[1.02] flex items-center justify-center gap-2 text-sm border border-green-500/50">
-                                            <i className="ph-fill ph-whatsapp-logo text-xl"></i> تواصل عبر واتساب
-                                        </button>
+                                        <div className="flex gap-2 w-full">
+                                            <button onClick={() => {
+                                                let msg = `مرحباً ${settings.studioName} 👋\nأود الاستفسار/الحجز بخصوص: *${selectedMiniProd.title}*`;
+                                                openWhatsApp(settings.studioPhone || '01201260040', msg);
+                                            }} className="flex-1 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 text-white font-black py-3 rounded-xl shadow-lg transition-transform hover:scale-[1.02] flex items-center justify-center gap-2 text-sm border border-green-500/50">
+                                                <i className="ph-fill ph-whatsapp-logo text-xl"></i> تواصل
+                                            </button>
+                                            
+                                            <button onClick={async () => {
+                                                const shareUrl = window.location.href.split('?')[0] + `?client=true&card=${selectedMiniProd.id}`;
+                                                const shareText = `✨ شوف المنتج الرائع ده من ${settings.studioName}:\n*${selectedMiniProd.title}*\nجودة ممتازة وأفضل سعر! 🎁\n\nاطلبه دلوقتي من هنا:`;
+                                                
+                                                if (navigator.share) {
+                                                    try { await navigator.share({ title: selectedMiniProd.title, text: shareText, url: shareUrl }); } catch (err) { console.error('Share failed', err); }
+                                                } else {
+                                                    navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+                                                    alert("تم نسخ الرابط والنص التسويقي بنجاح! يمكنك الآن مشاركته مع أصدقائك.");
+                                                }
+                                            }} className="w-12 sm:w-14 bg-slate-800 hover:bg-slate-700 text-yellow-400 font-black py-3 rounded-xl shadow-lg transition-transform hover:scale-[1.02] flex items-center justify-center border border-slate-700" title="مشاركة هذا العرض">
+                                                <i className="ph-bold ph-share-network text-xl"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1083,12 +1102,28 @@
                                         <p className="text-slate-300 font-bold mb-4">{selectedPromoModal.shortDesc}</p>
                                         {selectedPromoModal.fullDesc && <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 mb-6 shadow-inner"><p className="text-slate-400 text-sm leading-relaxed whitespace-pre-wrap">{selectedPromoModal.fullDesc}</p></div>}
                                         
-                                        <button onClick={() => {
-                                            let msg = `مرحباً ${settings.studioName} 👋\nأود الاستفسار/الحجز بخصوص: *${selectedPromoModal.title}*`;
-                                            openWhatsApp(settings.studioPhone || '01201260040', msg);
-                                        }} className="mt-auto w-full bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 text-white font-black py-3 rounded-xl shadow-lg transition-transform hover:scale-[1.02] flex items-center justify-center gap-2 text-sm border border-green-500/50">
-                                            <i className="ph-fill ph-whatsapp-logo text-xl"></i> تواصل عبر واتساب
-                                        </button>
+                                        <div className="flex gap-2 w-full mt-auto">
+                                            <button onClick={() => {
+                                                let msg = `مرحباً ${settings.studioName} 👋\nأود الاستفسار/الحجز بخصوص: *${selectedPromoModal.title}*`;
+                                                openWhatsApp(settings.studioPhone || '01201260040', msg);
+                                            }} className="flex-1 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 text-white font-black py-3 rounded-xl shadow-lg transition-transform hover:scale-[1.02] flex items-center justify-center gap-2 text-sm border border-green-500/50">
+                                                <i className="ph-fill ph-whatsapp-logo text-xl"></i> تواصل للحجز
+                                            </button>
+                                            
+                                            <button onClick={async () => {
+                                                const shareUrl = window.location.href.split('?')[0] + `?client=true&promo=${selectedPromoModal.id}`;
+                                                const shareText = `🔥 عرض حصري من ${settings.studioName}:\n*${selectedPromoModal.title}*\n${selectedPromoModal.shortDesc}\nلا تفوت الفرصة! 📸✨\n\nاحجز العرض دلوقتي من هنا:`;
+                                                
+                                                if (navigator.share) {
+                                                    try { await navigator.share({ title: selectedPromoModal.title, text: shareText, url: shareUrl }); } catch (err) { console.error('Share failed', err); }
+                                                } else {
+                                                    navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+                                                    alert("تم نسخ الرابط والنص التسويقي بنجاح! يمكنك الآن مشاركته مع أصدقائك.");
+                                                }
+                                            }} className="w-12 sm:w-14 bg-slate-800 hover:bg-slate-700 text-yellow-400 font-black py-3 rounded-xl shadow-lg transition-transform hover:scale-[1.02] flex items-center justify-center border border-slate-700" title="مشاركة هذا العرض">
+                                                <i className="ph-bold ph-share-network text-xl"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
